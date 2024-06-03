@@ -1,0 +1,5 @@
+use schema LZ_EDI_837;
+
+create transient TABLE IF NOT EXISTS MEMBER_STG (
+	MEMBER VARCHAR(16777216)
+);

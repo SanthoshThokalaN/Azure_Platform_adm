@@ -1,0 +1,5 @@
+snowflake-connector-python
+sqlfluff
+paramiko
+Jinja2
+PyYAML
