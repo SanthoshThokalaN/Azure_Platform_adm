@@ -1,0 +1,8 @@
+apiVersion: v1
+metadata:
+  askId: UHGWM110-017761
+  caAgileId: null
+  projectKey: null
+  projectFriendlyName: null
+  componentType: code
+  targetQG: GATE_EXEMPT
