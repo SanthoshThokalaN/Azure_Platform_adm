@@ -1,0 +1,41 @@
+{
+	"name": "tr_wf_EFFECTIVE_ERROR_MONTHLY",
+	"properties": {
+		"annotations": [],
+		"runtimeState": "Stopped",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "wf_EFFECTIVE_ERROR",
+					"type": "PipelineReference"
+				},
+				"parameters": {
+					"p_email_recipient": "isdc_nonprod@ds.uhc.com",
+					"p_util_schema": "UTIL",
+					"p_lz_compas": "LZ_COMPAS",
+					"p_compas": "compas"
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Month",
+				"interval": 1,
+				"startTime": "2024-02-05T02:17:00",
+				"timeZone": "Central Standard Time",
+				"schedule": {
+					"minutes": [
+						30
+					],
+					"hours": [
+						12
+					],
+					"monthDays": [
+						-1
+					]
+				}
+			}
+		}
+	}
+}

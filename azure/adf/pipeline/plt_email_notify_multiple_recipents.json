@@ -1,0 +1,139 @@
+{
+	"name": "plt_email_notify_multiple_recipents",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Secret",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 3,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@pipeline().globalParameters.par_graph_api_secret_id",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "irt-adf-isdc",
+						"type": "IntegrationRuntimeReference"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get Token",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get Secret",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/x-www-form-urlencoded"
+					},
+					"url": {
+						"value": "@concat('https://login.microsoftonline.com/',pipeline().globalParameters.par_tenant_id,'/oauth2/v2.0/token')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "irt-adf-isdc",
+						"type": "IntegrationRuntimeReference"
+					},
+					"body": {
+						"value": "@concat('client_id=',pipeline().globalParameters.par_graph_api_client_id,'&client_secret=',activity('Get Secret').output.value,'&scope=https://graph.microsoft.com/.default&grant_type=client_credentials')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Send Mail",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get Token",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"headers": {
+						"Authorization": {
+							"value": "@concat(string(activity('Get Token').output.token_type),' ',string(activity('Get Token').output.access_token))",
+							"type": "Expression"
+						},
+						"Content-Type": "application/json"
+					},
+					"url": {
+						"value": "@concat('https://graph.microsoft.com/v1.0/users/',pipeline().parameters.EmailSender,'/sendMail')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "irt-adf-isdc",
+						"type": "IntegrationRuntimeReference"
+					},
+					"body": {
+						"value": "@concat('{\"message\": {\"toRecipients\": ', pipeline().parameters.EmailRecipient, ',\"subject\": \"', pipeline().parameters.EmailSubject, '\",\"importance\": \"normal\",\"body\": {\"contentType\": \"HTML\",\"content\": \"', pipeline().parameters.EmailContentHTML, '\" }},\"SaveToSentItems\": ', 'false', '}')",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"EmailSender": {
+				"type": "string",
+				"defaultValue": "isdc_dev_dw@optum.com"
+			},
+			"EmailRecipient": {
+				"type": "string",
+				"defaultValue": "isdc_nonprod@ds.uhc.com"
+			},
+			"EmailSubject": {
+				"type": "string",
+				"defaultValue": "test"
+			},
+			"EmailContentHTML": {
+				"type": "string",
+				"defaultValue": "test"
+			}
+		},
+		"folder": {
+			"name": "PRE_CLM/Pipelets"
+		},
+		"annotations": [],
+		"lastPublishTime": "2023-12-18T02:52:38Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

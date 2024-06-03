@@ -1,0 +1,329 @@
+{
+	"name": "wkf_DI_IUD_Acesx_to_Stage_D",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get_Object_List",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Batch_Object_PreProcess",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SnowflakeV2Source",
+						"query": {
+							"value": "@concat('\nselect \nLOAD_TYPE,\nOBJECT_NAME,\nBATCH_ID,\nfrom ', \n\npipeline().parameters.p_util_schema, '.','ETL_BATCH_OBJECT_CONTROL\nWHERE APPLICATION = ''', pipeline().parameters.p_application,''' AND WORKFLOW_NAME = ''', pipeline().Pipeline, ''' AND STATUS IN (''READY'', ''ERROR'')'\n\n\n)",
+							"type": "Expression"
+						},
+						"exportSettings": {
+							"type": "SnowflakeExportCopyCommand"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_sf_v2_isdc",
+						"type": "DatasetReference",
+						"parameters": {
+							"par_sf_v2_acct": {
+								"value": "@pipeline().globalParameters.par_sf_v2_acct",
+								"type": "Expression"
+							},
+							"par_sf_v2_db": {
+								"value": "@pipeline().globalParameters.par_sf_v2_db",
+								"type": "Expression"
+							},
+							"par_sf_v2_user": {
+								"value": "@pipeline().globalParameters.par_sf_v2_user",
+								"type": "Expression"
+							},
+							"par_sf_v2_wh": {
+								"value": "@pipeline().globalParameters.par_sf_v2_wh",
+								"type": "Expression"
+							},
+							"par_sf_v2_role": {
+								"value": "@pipeline().globalParameters.par_sf_v2_role",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach_Object",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get_Object_List",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get_Object_List').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"batchCount": 20,
+					"activities": [
+						{
+							"name": "wkf_DI_Acesx_2_SF",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"policy": {
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "Batch_Id",
+									"value": "@item().BATCH_ID"
+								},
+								{
+									"name": "Object_Name",
+									"value": "@item().OBJECT_NAME"
+								}
+							],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "wkf_DI_Acesx_2_SF",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"p_application": {
+										"value": "@pipeline().parameters.p_application",
+										"type": "Expression"
+									},
+									"p_workflow_name": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"p_object_name": {
+										"value": "@item().OBJECT_NAME",
+										"type": "Expression"
+									},
+									"p_batch_id": {
+										"value": "@item().BATCH_ID",
+										"type": "Expression"
+									},
+									"p_util_schema": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"p_db_name": {
+										"value": "@pipeline().parameters.p_db_name",
+										"type": "Expression"
+									},
+									"p_proc_schema": {
+										"value": "@pipeline().parameters.p_proc_schema",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Batch_Object_PreProcess",
+				"type": "Script",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_v2_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_v2_acct": {
+							"value": "@pipeline().globalParameters.par_sf_v2_acct",
+							"type": "Expression"
+						},
+						"par_sf_v2_user": {
+							"value": "@pipeline().globalParameters.par_sf_v2_user",
+							"type": "Expression"
+						},
+						"par_sf_v2_db": {
+							"value": "@pipeline().globalParameters.par_sf_v2_db",
+							"type": "Expression"
+						},
+						"par_sf_v2_wh": {
+							"value": "@pipeline().globalParameters.par_sf_v2_wh",
+							"type": "Expression"
+						},
+						"par_sf_v2_role": {
+							"value": "@pipeline().globalParameters.par_sf_v2_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "NonQuery",
+							"text": {
+								"value": "@concat(\n'CALL ',\npipeline().parameters.p_util_schema, '.', \n'SP_BATCH_OBJECT_PREPROCESS',\n\n'(',   \n\n'''',pipeline().parameters.p_db_name, '''' , ',',\n'''',pipeline().parameters.p_util_schema, '''' , ',', \n'''',pipeline().parameters.p_application, '''' , ',',\n'''',pipeline().Pipeline, '''' ,\n\n')'\n\n\n)",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Batch_Object_PostProcess_Failure",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "ForEach_Object",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_v2_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_v2_acct": {
+							"value": "@pipeline().globalParameters.par_sf_v2_acct",
+							"type": "Expression"
+						},
+						"par_sf_v2_user": {
+							"value": "@pipeline().globalParameters.par_sf_v2_user",
+							"type": "Expression"
+						},
+						"par_sf_v2_db": {
+							"value": "@pipeline().globalParameters.par_sf_v2_db",
+							"type": "Expression"
+						},
+						"par_sf_v2_wh": {
+							"value": "@pipeline().globalParameters.par_sf_v2_wh",
+							"type": "Expression"
+						},
+						"par_sf_v2_role": {
+							"value": "@pipeline().globalParameters.par_sf_v2_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "NonQuery",
+							"text": {
+								"value": "@concat(\n'CALL ',\npipeline().parameters.p_util_schema, '.', \n'SP_BATCH_OBJECT_POSTPROCESS',\n\n'(',   \n\n'''',pipeline().parameters.p_db_name, '''' , ',',\n'''',pipeline().parameters.p_util_schema, '''' , ',', \n'''',pipeline().parameters.p_application, '''' , ',',\n'''',pipeline().Pipeline, '''' , ',',\n'''','Failed', '''' ,\n\n')'\n\n\n)\n\n",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Batch_Object_PostProcess_Success",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "ForEach_Object",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_v2_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_v2_acct": {
+							"value": "@pipeline().globalParameters.par_sf_v2_acct",
+							"type": "Expression"
+						},
+						"par_sf_v2_user": {
+							"value": "@pipeline().globalParameters.par_sf_v2_user",
+							"type": "Expression"
+						},
+						"par_sf_v2_db": {
+							"value": "@pipeline().globalParameters.par_sf_v2_db",
+							"type": "Expression"
+						},
+						"par_sf_v2_wh": {
+							"value": "@pipeline().globalParameters.par_sf_v2_wh",
+							"type": "Expression"
+						},
+						"par_sf_v2_role": {
+							"value": "@pipeline().globalParameters.par_sf_v2_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "NonQuery",
+							"text": {
+								"value": "@concat(\n'CALL ',\npipeline().parameters.p_util_schema, '.', \n'SP_BATCH_OBJECT_POSTPROCESS',\n\n'(',   \n\n'''',pipeline().parameters.p_db_name, '''' , ',',\n'''',pipeline().parameters.p_util_schema, '''' , ',', \n'''',pipeline().parameters.p_application, '''' , ',',\n'''',pipeline().Pipeline, '''' , ',',\n'''','Succeeded', '''' ,\n\n')'\n\n\n)\n\n",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			}
+		],
+		"parameters": {
+			"p_db_name": {
+				"type": "string"
+			},
+			"p_util_schema": {
+				"type": "string"
+			},
+			"p_proc_schema": {
+				"type": "string"
+			},
+			"p_application": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "DATA_INGESTION/ACESX"
+		},
+		"annotations": []
+	}
+}

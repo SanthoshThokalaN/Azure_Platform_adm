@@ -1,0 +1,660 @@
+{
+	"name": "tsk_DUPICLATE_CLAIMS_II",
+	"properties": {
+		"activities": [
+			{
+				"name": "Stage Duplicate Claims Report Temp",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "OracleSource",
+						"oracleReaderQuery": {
+							"value": "@concat(\n'SELECT DISTINCT clm.FCLTY_CD,\nclm.clm_num,\nb.acct_nbr as mem_id,\nclm.oper_id,\nprovidertin.tin,\nbill.bil_ln_num,\nclm.dt_cmpltd,\nclm.assgn_adj_amt,\nbill.ben_amt,\nclm.srv_from_dt,\nclm.srv_to_dt,\nbill.cpt_cd,\nbill.rend_prv_npi,\nprovider.NAT_PROV_ID,\nclm.inst_prof_ind,\nclm.clh_trk_id,\nclm.medcr_clm_ctl_nbr,\nclm.doc_ctl_nbr,\nclm.clm_recpt_dt,\nclm.clm_stat,\nclm.clm_src_cd,\nclm.tot_ben,\nclm.pay_adj_amt,\nbill.srv_cd,\nsusp.susp_rsn\nFROM  ',pipeline().parameters.p_fox_schema,'.clm_hist clm\nLEFT JOIN ',pipeline().parameters.p_fox_schema,'.bil_ln_hist2 bill\n\tON clm.ch_key = bill.ch_key\nLEFT JOIN (SELECT * FROM ( SELECT  A.SUSP_KEY,A.CH_KEY,A.SUSP_RSN,A.SUSP_DT,A.CH_ACCT_PART_NUM,ROW_NUMBER() OVER (PARTITION BY CH_KEY ORDER BY SEQ_NUM DESC) RN\n        FROM ',pipeline().parameters.p_fox_schema,'.SUSP A) WHERE RN = 1) susp  \n\tON clm.ch_key = susp.ch_key\nLEFT JOIN ',pipeline().parameters.p_fox_schema,'.acct_info b\n\tON clm.acct_info_key = b.acct_info_key\nLEFT JOIN ',pipeline().parameters.p_fox_schema,'.prov provider\n\tON clm.assgn_prv_key = provider.prov_id\nLEFT JOIN ',pipeline().parameters.p_fox_schema,'.tin providerTIN ON provider.tin_id = providerTIN.tin_id\nWHERE clm.dt_cmpltd >= TO_TIMESTAMP(to_char(sysdate,''yyyy-mm-dd'')||'' ''|| ''00:00:00'',''YYYY-MM-DD HH24:MI:SS.FF'')\n    AND clm.dt_cmpltd < TO_TIMESTAMP(to_char(sysdate,''yyyy-mm-dd'')||'' ''|| ''23:59:59.809818811'',''YYYY-MM-DD HH24:MI:SS.FF'')\n\tAND clm.assgn_adj_amt = ''0''\n\tAND clm.pay_adj_amt = ''0''\n\tAND clm.clm_stat not in (''S'',''X'')\n\tAND bill.ben_amt <> ''0''\n\tAND clm.clm_src_cd <> ''CMS''\n\tAND NVL(susp.susp_rsn,''NULL'') <> ''1X''\n\tAND bill.srv_cd in (''H'',''W'',''Q'') ')",
+							"type": "Expression"
+						},
+						"partitionOption": "None",
+						"convertDecimalToInteger": false,
+						"queryTimeout": "02:00:00"
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"maxRowsPerFile": 100000,
+							"fileNamePrefix": "duplicate_claims_2_report_temp",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_ora_fox",
+						"type": "DatasetReference"
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_ablob_on_prem_db_to_sf",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_source_name": "fox",
+							"p_table_name": "duplicate_claims_2_report_temp",
+							"p_env": {
+								"value": "@pipeline().globalParameters.par_env",
+								"type": "Expression"
+							},
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Delete Staged Files Duplicate Claims II  Report Temp",
+				"type": "Delete",
+				"dependsOn": [
+					{
+						"activity": "Load Duplicate Claims 2 Report Temp",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_ablob_on_prem_db_to_sf",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_source_name": "fox",
+							"p_table_name": "duplicate_claims_2_report_temp",
+							"p_env": {
+								"value": "@pipeline().globalParameters.par_env",
+								"type": "Expression"
+							},
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"wildcardFileName": "*.*",
+						"enablePartitionDiscovery": false
+					}
+				}
+			},
+			{
+				"name": "Truncate Duplicate Claims II Report Temp",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Stage Duplicate Claims Report Temp",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DB_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().globalParameters.par_sf_db",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": {
+								"value": "@concat('TRUNCATE TABLE ', pipeline().parameters.p_lz_fox_schema, '.DUPLICATE_CLAIMS_2_REPORT_TEMP;')",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Load Duplicate Claims 2 Report Temp",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Truncate Duplicate Claims II Report Temp",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "DUPLICATE_CLAIMS2_REPORT_TEMP",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline()?.TriggeredByPipelineName,3,add(length(pipeline()?.TriggeredByPipelineName), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "STAGE Load ISDW Historical Data",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Delete Staged Files Duplicate Claims II  Report Temp",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "OracleSource",
+						"oracleReaderQuery": {
+							"value": "@concat(\n'SELECT DISTINCT clm.fclty_cd,\nclm.clm_num,\nb.acct_nbr as mem_id,\nclm.dt_cmpltd,\nclm.assgn_adj_amt,\nbill.ben_amt,\nclm.srv_from_dt,\nclm.srv_to_dt,\nbill.cpt_cd,\nbill.rend_prv_npi,\nprovider.NAT_PROV_ID,\nclm.inst_prof_ind,\nclm.clh_trk_id,\nclm.medcr_clm_ctl_nbr,\nclm.doc_ctl_nbr,\nclm.clm_recpt_dt,\nclm.clm_stat,\nclm.tot_ben,\nclm.pay_adj_amt,\nbill.srv_cd as tos_cd\nFROM ',pipeline().parameters.p_isdw_schema1,'.clm_hist clm\nLEFT JOIN ',pipeline().parameters.p_isdw_schema1,'.bil_ln_hist2 bill\n  ON clm.ch_key = bill.ch_key\nLEFT JOIN ',pipeline().parameters.p_isdw_schema2,'.prov provider\n\tON clm.assgn_prv_key = provider.prov_id\nLEFT JOIN ',pipeline().parameters.p_isdw_schema2,'.acct_info b\n  ON clm.acct_info_key = b.acct_info_key\nWHERE clm.dt_cmpltd between TO_TIMESTAMP(to_char(sysdate-366,''yyyy-mm-dd'')||'' ''|| ''23:59:59'',''YYYY-MM-DD HH24:MI:SS.FF'')\n    AND TO_TIMESTAMP(to_char(sysdate-1,''yyyy-mm-dd'')||'' ''|| ''00:00:00'',''YYYY-MM-DD HH24:MI:SS.FF'')\n  AND bill.ben_amt <> ''0''\n\tAND bill.srv_cd in (''H'',''W'',''Q'')\n\tAND clm.clm_stat not in (''S'',''X'')\n\tAND clm.assgn_adj_amt = ''0'' ')",
+							"type": "Expression"
+						},
+						"partitionOption": "None",
+						"convertDecimalToInteger": false,
+						"queryTimeout": "02:00:00"
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"maxRowsPerFile": 100000,
+							"fileNamePrefix": "duplicate_claims_2_report_isdw_temp",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_ora_isdw",
+						"type": "DatasetReference"
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_ablob_on_prem_db_to_sf",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_source_name": "isdw",
+							"p_table_name": "duplicate_claims_2_report_isdw_temp",
+							"p_env": {
+								"value": "@pipeline().globalParameters.par_env",
+								"type": "Expression"
+							},
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Truncate Duplicate Claims II ISDW TEMP TABLE",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "STAGE Load ISDW Historical Data",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DB_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().globalParameters.par_sf_db",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": {
+								"value": "@concat('TRUNCATE TABLE ', pipeline().parameters.p_lz_isdw_schema, '.DUPLICATE_CLAIMS_2_REPORT_ISDW_TEMP;')",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Load Duplicate Claims II ISDW TEMP Table",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Truncate Duplicate Claims II ISDW TEMP TABLE",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "DUPLICATE_CLAIMS2_ISDW_REPORT_TEMP",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline()?.TriggeredByPipelineName,3,add(length(pipeline()?.TriggeredByPipelineName), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Delete Staged Files Duplicate Claims II ISDW TEMP",
+				"type": "Delete",
+				"dependsOn": [
+					{
+						"activity": "Load Duplicate Claims II ISDW TEMP Table",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_ablob_on_prem_db_to_sf",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_source_name": "isdw",
+							"p_table_name": "duplicate_claims_2_report_isdw_temp",
+							"p_env": {
+								"value": "@pipeline().globalParameters.par_env",
+								"type": "Expression"
+							},
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"wildcardFileName": "*.*",
+						"enablePartitionDiscovery": false
+					}
+				}
+			}
+		],
+		"parameters": {
+			"p_lz_fox_schema": {
+				"type": "string"
+			},
+			"p_util_schema": {
+				"type": "string"
+			},
+			"p_fox_schema": {
+				"type": "string"
+			},
+			"p_isdw_schema1": {
+				"type": "string"
+			},
+			"p_isdw_schema2": {
+				"type": "string"
+			},
+			"p_lz_isdw_schema": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "PRE_CLM/Tasks"
+		},
+		"annotations": []
+	}
+}

@@ -1,0 +1,33 @@
+{
+	"name": "tr_wf_TESTBED_EXTRACT",
+	"properties": {
+		"annotations": [],
+		"runtimeState": "Stopped",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "wf_TESTBED_EXTRACT",
+					"type": "PipelineReference"
+				},
+				"parameters": {
+					"p_email_recipient": "isdc_nonprod@ds.uhc.com",
+					"p_util_schema": "UTIL",
+					"p_lz_isdw_schema": "LZ_ISDW",
+					"p_lz_fox_schema": "LZ_FOX",
+					"p_src_fox_schema": "SRC_FOX",
+					"p_fox_schema": "dummy"
+				}
+			}
+		],
+		"type": "BlobEventsTrigger",
+		"typeProperties": {
+			"blobPathBeginsWith": "/isdc/blobs/$$$env_name/landing/testbed/20",
+			"blobPathEndsWith": ".txt",
+			"ignoreEmptyBlobs": true,
+			"scope": "/subscriptions/df55fbe1-ac66-4549-a170-1a3bbb27a6bf/resourceGroups/rg-isdc-nonprod/providers/Microsoft.Storage/storageAccounts/saisdcnonprod",
+			"events": [
+				"Microsoft.Storage.BlobCreated"
+			]
+		}
+	}
+}

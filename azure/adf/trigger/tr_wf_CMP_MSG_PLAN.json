@@ -1,0 +1,32 @@
+{
+	"name": "tr_wf_CMP_MSG_PLAN",
+	"properties": {
+		"annotations": [],
+		"runtimeState": "Stopped",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "wf_CMP_MSG_PLAN",
+					"type": "PipelineReference"
+				},
+				"parameters": {
+					"p_email_recipient": "isdc_nonprod@ds.uhc.com",
+					"p_util_schema": "util",
+					"p_compas_schema": "MESSAGE_PROD",
+					"p_src_compas_schema": "src_compas",
+					"p_lz_compas_schema": "lz_compas",
+					"p_lz_isdw_schema": "lz_isdw"
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Minute",
+				"interval": 30,
+				"startTime": "2024-02-05T02:33:00",
+				"timeZone": "Central Standard Time"
+			}
+		}
+	}
+}

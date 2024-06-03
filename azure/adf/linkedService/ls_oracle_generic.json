@@ -1,0 +1,42 @@
+{
+	"name": "ls_oracle_generic",
+	"properties": {
+		"parameters": {
+			"p_host": {
+				"type": "string"
+			},
+			"p_port": {
+				"type": "string"
+			},
+			"p_service_name": {
+				"type": "string"
+			},
+			"p_user_name": {
+				"type": "string"
+			},
+			"p_secret_name": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Oracle",
+		"typeProperties": {
+			"connectionString": "host=@{linkedService().p_host};port=@{linkedService().p_port};serviceName=@{linkedService().p_service_name};user id=@{linkedService().p_user_name}",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "ls_keyvault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@linkedService().p_secret_name",
+					"type": "Expression"
+				}
+			}
+		},
+		"connectVia": {
+			"referenceName": "shir-adf-isdc",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

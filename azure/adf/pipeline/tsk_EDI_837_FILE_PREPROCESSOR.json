@@ -1,0 +1,728 @@
+{
+	"name": "tsk_EDI_837_FILE_PREPROCESSOR",
+	"properties": {
+		"activities": [
+			{
+				"name": "Until the Data File Trigger",
+				"type": "Until",
+				"dependsOn": [
+					{
+						"activity": "Wait_for_10_Minutes",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [
+					{
+						"name": "Name",
+						"value": "@pipeline().parameters.p_file_source"
+					}
+				],
+				"typeProperties": {
+					"expression": {
+						"value": "@bool(variables('v_data_trig_file_exists'))",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Get Data Trigger File Metadata",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 300,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "Name",
+									"value": "@pipeline().parameters.p_file_source"
+								}
+							],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "ds_edi_837_files",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/landing/edi/xml/',pipeline().parameters.p_file_source)",
+											"type": "Expression"
+										},
+										"p_file_name": {
+											"value": "@if(\n    equals(toUpper(pipeline().parameters.p_file_source), 'CMS_837P'), \n    \n    \n    concat(toUpper(pipeline().parameters.p_file_source), '_O_*.txt.zip.trig'), \n    \n    concat(toUpper(pipeline().parameters.p_file_source), 'S_O_*.txt.zip.trig')\n\n\n\n)",
+											"type": "Expression"
+										},
+										"p_hotstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"childItems"
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							}
+						},
+						{
+							"name": "If Data Trigger File Exists",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Get Data Trigger File Metadata",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [
+								{
+									"name": "Name",
+									"value": "@pipeline().parameters.p_file_source"
+								}
+							],
+							"typeProperties": {
+								"expression": {
+									"value": "@greater(length(activity('Get Data Trigger File Metadata').output.childItems), 0)",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Wait 10 minutes",
+										"type": "Wait",
+										"dependsOn": [],
+										"userProperties": [
+											{
+												"name": "Name",
+												"value": "@pipeline().parameters.p_file_source"
+											}
+										],
+										"typeProperties": {
+											"waitTimeInSeconds": 600
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Set variable true",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "Name",
+												"value": "@pipeline().parameters.p_file_source"
+											}
+										],
+										"typeProperties": {
+											"variableName": "v_data_trig_file_exists",
+											"value": true
+										}
+									}
+								]
+							}
+						}
+					],
+					"timeout": "0.01:00:00"
+				}
+			},
+			{
+				"name": "ForEach Trigger File",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Until the Data File Trigger",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [
+					{
+						"name": "Name",
+						"value": "@pipeline().parameters.p_file_source"
+					}
+				],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Data Trigger File Metadata').output.childItems",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Set Variable - File Pattern",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "Name",
+									"value": "@pipeline().parameters.p_file_source"
+								}
+							],
+							"typeProperties": {
+								"variableName": "v_file_pattern",
+								"value": {
+									"value": "@substring(item().name, 0, add(length(item().name), -27))",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Get Metadata for 6 files",
+							"type": "GetMetadata",
+							"dependsOn": [
+								{
+									"activity": "Set Variable - File Pattern",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 300,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "Name",
+									"value": "@pipeline().parameters.p_file_source"
+								}
+							],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "ds_edi_837_files",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/landing/edi/xml/',pipeline().parameters.p_file_source)",
+											"type": "Expression"
+										},
+										"p_file_name": {
+											"value": "@concat(variables('v_file_pattern'), '*.*')",
+											"type": "Expression"
+										},
+										"p_hotstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"childItems"
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							}
+						},
+						{
+							"name": "If 6 files exists with the pattern",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Get Metadata for 6 files",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [
+								{
+									"name": "Name",
+									"value": "@pipeline().parameters.p_file_source"
+								}
+							],
+							"typeProperties": {
+								"expression": {
+									"value": "@equals(length(activity('Get Metadata for 6 files').output.childItems), 6)",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "plt_Email_6_files_not_received",
+										"type": "ExecutePipeline",
+										"dependsOn": [],
+										"policy": {
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "Name",
+												"value": "@pipeline().parameters.p_file_source"
+											}
+										],
+										"typeProperties": {
+											"pipeline": {
+												"referenceName": "plt_email_notify",
+												"type": "PipelineReference"
+											},
+											"waitOnCompletion": true,
+											"parameters": {
+												"EmailSender": {
+													"value": "@pipeline().parameters.p_email_sender",
+													"type": "Expression"
+												},
+												"EmailRecipient": {
+													"value": "@pipeline().parameters.p_email_recipient",
+													"type": "Expression"
+												},
+												"EmailSubject": {
+													"value": "@concat(toUpper(pipeline().globalParameters.par_env),' - ', 'EDI ', toUpper(pipeline().parameters.p_file_source), ' - 6 Files Not Received')",
+													"type": "Expression"
+												},
+												"EmailContentHTML": {
+													"value": "@concat('ProcessName : ', pipeline()?.TriggeredByPipelineName, \n\n'<br>', 'FileName: ', variables('v_file_pattern'),  \n\n'<br>', 'All the 6 files not received for the above pattern. Once all the 6 files are received, run the job manually or manually create the trigger (.txt.zip.trig) again in the respective blob directory.'\n\n )",
+													"type": "Expression"
+												}
+											}
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Move Files from Landing to Inbox",
+										"description": "Move Files from Landing to Inbox",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 2,
+											"retryIntervalInSeconds": 300,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "Name",
+												"value": "@pipeline().parameters.p_file_source"
+											}
+										],
+										"typeProperties": {
+											"source": {
+												"type": "DelimitedTextSource",
+												"storeSettings": {
+													"type": "AzureBlobStorageReadSettings",
+													"recursive": true,
+													"wildcardFolderPath": {
+														"value": "@concat(pipeline().globalParameters.par_env, '/landing/edi/xml/',pipeline().parameters.p_file_source)",
+														"type": "Expression"
+													},
+													"wildcardFileName": {
+														"value": "@concat(variables('v_file_pattern'), '*.*')",
+														"type": "Expression"
+													},
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings"
+												}
+											},
+											"sink": {
+												"type": "DelimitedTextSink",
+												"storeSettings": {
+													"type": "AzureBlobStorageWriteSettings"
+												},
+												"formatSettings": {
+													"type": "DelimitedTextWriteSettings",
+													"quoteAllText": true,
+													"fileExtension": ".txt"
+												}
+											},
+											"enableStaging": false,
+											"translator": {
+												"type": "TabularTranslator",
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "ds_edi_837_files",
+												"type": "DatasetReference",
+												"parameters": {
+													"p_folder_name": {
+														"value": "@concat(pipeline().globalParameters.par_env, '/landing/edi/xml/',pipeline().parameters.p_file_source)",
+														"type": "Expression"
+													},
+													"p_file_name": "*",
+													"p_hotstore_endpoint": {
+														"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "ds_edi_837_files",
+												"type": "DatasetReference",
+												"parameters": {
+													"p_folder_name": {
+														"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/',pipeline().parameters.p_file_source)",
+														"type": "Expression"
+													},
+													"p_file_name": " ",
+													"p_hotstore_endpoint": {
+														"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "Unzip the Data File in Inbox",
+										"type": "Copy",
+										"dependsOn": [
+											{
+												"activity": "Move Files from Landing to Inbox",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 2,
+											"retryIntervalInSeconds": 300,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "Name",
+												"value": "@pipeline().parameters.p_file_source"
+											}
+										],
+										"typeProperties": {
+											"source": {
+												"type": "DelimitedTextSource",
+												"storeSettings": {
+													"type": "AzureBlobStorageReadSettings",
+													"recursive": true,
+													"wildcardFolderPath": {
+														"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/', pipeline().parameters.p_file_source)",
+														"type": "Expression"
+													},
+													"wildcardFileName": {
+														"value": "@concat(variables('v_file_pattern'), '*.txt*.zip')",
+														"type": "Expression"
+													},
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings",
+													"compressionProperties": {
+														"type": "ZipDeflateReadSettings",
+														"preserveZipFileNameAsFolder": false
+													}
+												}
+											},
+											"sink": {
+												"type": "DelimitedTextSink",
+												"storeSettings": {
+													"type": "AzureBlobStorageWriteSettings"
+												},
+												"formatSettings": {
+													"type": "DelimitedTextWriteSettings",
+													"quoteAllText": true,
+													"fileExtension": ".txt"
+												}
+											},
+											"enableStaging": false,
+											"translator": {
+												"type": "TabularTranslator",
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "ds_unzip_edi_837_files",
+												"type": "DatasetReference",
+												"parameters": {
+													"p_folder_name": {
+														"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/', pipeline().parameters.p_file_source)",
+														"type": "Expression"
+													},
+													"p_hotstore_endpoint": {
+														"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "ds_edi_837_files",
+												"type": "DatasetReference",
+												"parameters": {
+													"p_folder_name": {
+														"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/', pipeline().parameters.p_file_source, '/data')",
+														"type": "Expression"
+													},
+													"p_file_name": " ",
+													"p_hotstore_endpoint": {
+														"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "Delete the files from Landing",
+										"type": "Delete",
+										"dependsOn": [
+											{
+												"activity": "Unzip the Data File in Inbox",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 2,
+											"retryIntervalInSeconds": 300,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "Name",
+												"value": "@pipeline().parameters.p_file_source"
+											}
+										],
+										"typeProperties": {
+											"dataset": {
+												"referenceName": "ds_edi_837_files",
+												"type": "DatasetReference",
+												"parameters": {
+													"p_folder_name": {
+														"value": "@concat(pipeline().globalParameters.par_env, '/landing/edi/xml/',pipeline().parameters.p_file_source)",
+														"type": "Expression"
+													},
+													"p_file_name": "*",
+													"p_hotstore_endpoint": {
+														"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+														"type": "Expression"
+													}
+												}
+											},
+											"enableLogging": false,
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": true,
+												"wildcardFileName": {
+													"value": "@{concat(variables('v_file_pattern'), '*.*')}",
+													"type": "Expression"
+												},
+												"enablePartitionDiscovery": false
+											}
+										}
+									},
+									{
+										"name": "Reconcile Control and Data File Counts",
+										"type": "Lookup",
+										"dependsOn": [
+											{
+												"activity": "Delete the files from Landing",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 2,
+											"retryIntervalInSeconds": 300,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "Name",
+												"value": "@pipeline().parameters.p_file_source"
+											}
+										],
+										"typeProperties": {
+											"source": {
+												"type": "SnowflakeSource",
+												"query": {
+													"value": "@concat('SELECT \n(SELECT count(*) as DATA_FILE_CNT from (\nSELECT t.$1 FROM @UTIL.STAGE_AZURE_ISDC/pre_clm/inbox/', pipeline().parameters.p_file_source, '/data ', '(file_format => ', '''', 'UTIL.FF_XML','''', ', pattern=>', '''.*',variables('v_file_pattern'),'.*txt', '''', ') t))  DATA_FILE_CNT, \n\n\nCOALESCE((SELECT t.$2   AS CONTROL_FILE_CNT FROM @UTIL.STAGE_AZURE_ISDC/pre_clm/inbox/', pipeline().parameters.p_file_source,  ' (file_format => ', '''', 'UTIL.FF_COLON_CSV','''', ', pattern=>', '''.*',variables('v_file_pattern'), 'CTL_.*txt', '''', ') t), 0) \nCONTROL_FILE_CNT')",
+													"type": "Expression"
+												},
+												"exportSettings": {
+													"type": "SnowflakeExportCopyCommand"
+												}
+											},
+											"dataset": {
+												"referenceName": "ds_sf_isdc",
+												"type": "DatasetReference",
+												"parameters": {
+													"par_sf_acct": {
+														"value": "@pipeline().globalParameters.par_sf_acct",
+														"type": "Expression"
+													},
+													"par_sf_db": {
+														"value": "@pipeline().globalParameters.par_sf_db",
+														"type": "Expression"
+													},
+													"par_sf_user": {
+														"value": "@pipeline().globalParameters.par_sf_user",
+														"type": "Expression"
+													},
+													"par_sf_wh": {
+														"value": "@pipeline().globalParameters.par_sf_wh",
+														"type": "Expression"
+													},
+													"par_sf_role": {
+														"value": "@pipeline().globalParameters.par_sf_role",
+														"type": "Expression"
+													}
+												}
+											}
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "If control and data file count match",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "If 6 files exists with the pattern",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [
+								{
+									"name": "Name",
+									"value": "@pipeline().parameters.p_file_source"
+								}
+							],
+							"typeProperties": {
+								"expression": {
+									"value": "@if(equals(length(activity('Get Metadata for 6 files').output.childItems), 6), \n\nequals(activity('Reconcile Control and Data File Counts').output.firstRow.DATA_FILE_CNT, int(activity('Reconcile Control and Data File Counts').output.firstRow.CONTROL_FILE_CNT))\n\n\n\n, equals(1, 1)\n\n\n\n)\n\n\n\n\n\n\n\n\n",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "plt_Email",
+										"type": "ExecutePipeline",
+										"dependsOn": [],
+										"policy": {
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "Name",
+												"value": "@pipeline().parameters.p_file_source"
+											}
+										],
+										"typeProperties": {
+											"pipeline": {
+												"referenceName": "plt_email_notify",
+												"type": "PipelineReference"
+											},
+											"waitOnCompletion": true,
+											"parameters": {
+												"EmailSender": {
+													"value": "@pipeline().parameters.p_email_sender",
+													"type": "Expression"
+												},
+												"EmailRecipient": {
+													"value": "@pipeline().parameters.p_email_recipient",
+													"type": "Expression"
+												},
+												"EmailSubject": {
+													"value": "@concat(toUpper(pipeline().globalParameters.par_env),' - ', 'EDI ', toUpper(pipeline().parameters.p_file_source), ' Control and Data File Counts Mismatch')",
+													"type": "Expression"
+												},
+												"EmailContentHTML": {
+													"value": "@concat('ProcessName : ', pipeline()?.TriggeredByPipelineName, \n\n'<br>', 'FileName: ', variables('v_file_pattern'), '*.txt', \n\n'<br>', 'DataFileCount: ', activity('Reconcile Control and Data File Counts').output.firstRow.DATA_FILE_CNT, \n\n'<br>', 'ControlFileCount: ', activity('Reconcile Control and Data File Counts').output.firstRow.CONTROL_FILE_CNT\n\n )",
+													"type": "Expression"
+												}
+											}
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Wait_for_10_Minutes",
+				"type": "Wait",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"waitTimeInSeconds": 600
+				}
+			}
+		],
+		"parameters": {
+			"p_file_source": {
+				"type": "string"
+			},
+			"p_email_sender": {
+				"type": "string"
+			},
+			"p_email_recipient": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"v_file_pattern": {
+				"type": "String"
+			},
+			"v_data_trig_file_exists": {
+				"type": "Boolean",
+				"defaultValue": false
+			}
+		},
+		"folder": {
+			"name": "PRE_CLM/Tasks"
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-03-07T00:21:33Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

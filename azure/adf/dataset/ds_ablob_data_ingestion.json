@@ -1,0 +1,46 @@
+{
+	"name": "ds_ablob_data_ingestion",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_ablob_isdc",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"p_hotstore_endpoint": {
+					"value": "@dataset().p_hotstore_endpoint",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"p_source_name": {
+				"type": "string"
+			},
+			"p_schema_name": {
+				"type": "string"
+			},
+			"p_table_name": {
+				"type": "string"
+			},
+			"p_env": {
+				"type": "string"
+			},
+			"p_hotstore_endpoint": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Parquet",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"folderPath": {
+					"value": "@concat(dataset().p_env,'/data_ingestion/',dataset().p_source_name, '/',dataset().p_schema_name, '/', dataset().p_table_name)",
+					"type": "Expression"
+				},
+				"container": "isdc"
+			},
+			"compressionCodec": "gzip"
+		},
+		"schema": []
+	}
+}

@@ -1,0 +1,47 @@
+{
+	"name": "ds_ablob_files1",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_ablob_isdc",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"p_hotstore_endpoint": {
+					"value": "@dataset().p_hotstore_endpoint",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"p_folder_name": {
+				"type": "string"
+			},
+			"p_file_name": {
+				"type": "string"
+			},
+			"p_hotstore_endpoint": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"fileName": {
+					"value": "@dataset().p_file_name",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().p_folder_name",
+					"type": "Expression"
+				},
+				"container": "isdc"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	}
+}

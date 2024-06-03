@@ -1,0 +1,323 @@
+{
+	"name": "wkf_DI_Fox_Framework_RT",
+	"properties": {
+		"activities": [
+			{
+				"name": "wkf_DI_IUD_Fox_to_Stage_RT",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Batch_PreProcess",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "wkf_DI_IUD_Fox_to_Stage_RT",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_db_name": {
+							"value": "@pipeline().parameters.p_db_name",
+							"type": "Expression"
+						},
+						"p_util_schema": {
+							"value": "@pipeline().parameters.p_util_schema",
+							"type": "Expression"
+						},
+						"p_proc_schema": {
+							"value": "@pipeline().parameters.p_proc_schema",
+							"type": "Expression"
+						},
+						"p_application": {
+							"value": "@pipeline().parameters.p_application",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set_variable",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "wkf_DI_IUD_Fox_to_Stage_RT",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "dummy",
+					"value": "true"
+				}
+			},
+			{
+				"name": "Batch_PreProcess",
+				"type": "Script",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_v2_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_v2_acct": {
+							"value": "@pipeline().globalParameters.par_sf_v2_acct",
+							"type": "Expression"
+						},
+						"par_sf_v2_user": {
+							"value": "@pipeline().globalParameters.par_sf_v2_user",
+							"type": "Expression"
+						},
+						"par_sf_v2_db": {
+							"value": "@pipeline().globalParameters.par_sf_v2_db",
+							"type": "Expression"
+						},
+						"par_sf_v2_wh": {
+							"value": "@pipeline().globalParameters.par_sf_v2_wh",
+							"type": "Expression"
+						},
+						"par_sf_v2_role": {
+							"value": "@pipeline().globalParameters.par_sf_v2_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "NonQuery",
+							"text": {
+								"value": "@concat(\n'CALL ',\npipeline().parameters.p_util_schema, '.', \n'SP_BATCH_PREPROCESS',\n\n'(',   \n\n'''',pipeline().parameters.p_db_name, '''' , ',',\n'''',pipeline().parameters.p_util_schema, '''' , ',', \n'''',pipeline().parameters.p_application, '''' , ',',\n'''',pipeline().parameters.p_common_batch_app, '''' ,\n\n')'\n\n\n)",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Batch_PostProcess",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "wkf_DI_IUD_Fox_to_Stage_RT",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_v2_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_v2_acct": {
+							"value": "@pipeline().globalParameters.par_sf_v2_acct",
+							"type": "Expression"
+						},
+						"par_sf_v2_user": {
+							"value": "@pipeline().globalParameters.par_sf_v2_user",
+							"type": "Expression"
+						},
+						"par_sf_v2_db": {
+							"value": "@pipeline().globalParameters.par_sf_v2_db",
+							"type": "Expression"
+						},
+						"par_sf_v2_wh": {
+							"value": "@pipeline().globalParameters.par_sf_v2_wh",
+							"type": "Expression"
+						},
+						"par_sf_v2_role": {
+							"value": "@pipeline().globalParameters.par_sf_v2_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "NonQuery",
+							"text": {
+								"value": "@concat(\n'CALL ',\npipeline().parameters.p_util_schema, '.', \n'SP_BATCH_POSTPROCESS',\n\n'(',   \n\n'''',pipeline().parameters.p_db_name, '''' , ',',\n'''',pipeline().parameters.p_util_schema, '''' , ',', \n'''',pipeline().parameters.p_application, '''' , ',',\n'''',pipeline().parameters.p_common_batch_app, '''' , ',',\n'''',activity('wkf_DI_IUD_Fox_to_Stage_RT').Status, '''' ,\n\n')'\n\n\n)\n\n",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Get_Batch_Details",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "wkf_DI_IUD_Fox_to_Stage_RT",
+						"dependencyConditions": [
+							"Failed"
+						]
+					},
+					{
+						"activity": "Batch_PostProcess",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SnowflakeV2Source",
+						"query": {
+							"value": "@concat('\nselect \nBATCH_ID,\nTO_CHAR(BATCH_START_DATETIME) AS BATCH_START_DATETIME,\nTO_CHAR(BATCH_END_DATETIME) AS BATCH_END_DATETIME\nfrom ', \n\npipeline().parameters.p_util_schema, '.','ETL_BATCH_LOG\nWHERE APPLICATION = ''', pipeline().parameters.p_application, ''' AND BATCH_STATUS IN (''ERROR'') ORDER BY BATCH_START_DATETIME DESC LIMIT 1'\n\n\n)",
+							"type": "Expression"
+						},
+						"exportSettings": {
+							"type": "SnowflakeExportCopyCommand"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_sf_v2_isdc",
+						"type": "DatasetReference",
+						"parameters": {
+							"par_sf_v2_acct": {
+								"value": "@pipeline().globalParameters.par_sf_v2_acct",
+								"type": "Expression"
+							},
+							"par_sf_v2_db": {
+								"value": "@pipeline().globalParameters.par_sf_v2_db",
+								"type": "Expression"
+							},
+							"par_sf_v2_user": {
+								"value": "@pipeline().globalParameters.par_sf_v2_user",
+								"type": "Expression"
+							},
+							"par_sf_v2_wh": {
+								"value": "@pipeline().globalParameters.par_sf_v2_wh",
+								"type": "Expression"
+							},
+							"par_sf_v2_role": {
+								"value": "@pipeline().globalParameters.par_sf_v2_role",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": true
+				}
+			},
+			{
+				"name": "wkf_email_failure",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Get_Batch_Details",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "wkf_email_failure",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailSender": {
+							"value": "@pipeline().globalParameters.par_email_sender",
+							"type": "Expression"
+						},
+						"EmailRecipient": {
+							"value": "@pipeline().parameters.p_email_recipient",
+							"type": "Expression"
+						},
+						"EmailSubject": {
+							"value": "@concat(pipeline().DataFactory, ' - ', pipeline().parameters.p_application,'  Data Load Failed')",
+							"type": "Expression"
+						},
+						"EmailContentHTML": {
+							"value": "@concat('The    ',pipeline().parameters.p_application, '  ETL has completed with errors.','</br>','   ',\n\n'</br>','Environment : ', pipeline().DataFactory,'</br>','  ',\n\n'</br>','WorkFlow : ', pipeline().Pipeline,'</br>','  ',\n\n'</br>',' Batch ID :',activity('Get_Batch_Details').output.firstRow.BATCH_ID,'</br>','  ',\n\n'</br>','Started At :',string(activity('Get_Batch_Details').output.firstRow.BATCH_START_DATETIME),'</br>','  ',\n\n'</br>','Completed At :',string(activity('Get_Batch_Details').output.firstRow.BATCH_END_DATETIME),'</br>','  ',\n\n'</br>',' Please check ETL_BATCH_OBJECT_CONTROL & ETL_BATCH_OBJECT_CONTROL_LOG tables for more details.','</br>','  ','</br>','This is an automatically generated message. Please Do not reply.','</br>','  ','</br>','Contact ISDC Support for any further information.','</br>','  ','</br>','******************************************************')",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"concurrency": 1,
+		"parameters": {
+			"p_db_name": {
+				"type": "string",
+				"defaultValue": "UBLIA_DEV_ISDC_DEV_DB"
+			},
+			"p_util_schema": {
+				"type": "string",
+				"defaultValue": "UTIL"
+			},
+			"p_proc_schema": {
+				"type": "string",
+				"defaultValue": "SRC_FOX"
+			},
+			"p_application": {
+				"type": "string",
+				"defaultValue": "ODS_FOX_RT_CLONE"
+			},
+			"p_common_batch_app": {
+				"type": "string",
+				"defaultValue": "ODS_FOX_RT_CLONE"
+			},
+			"p_email_recipient": {
+				"type": "string",
+				"defaultValue": "isdc_nonprod@ds.uhc.com"
+			}
+		},
+		"variables": {
+			"dummy": {
+				"type": "String",
+				"defaultValue": "true"
+			}
+		},
+		"folder": {
+			"name": "DATA_INGESTION/FOX"
+		},
+		"annotations": [
+			"wkf_DI_Fox_Framework_RT"
+		]
+	}
+}

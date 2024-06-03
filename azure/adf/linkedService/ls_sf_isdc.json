@@ -1,0 +1,41 @@
+{
+	"name": "ls_sf_isdc",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"parameters": {
+			"par_sf_acct": {
+				"type": "string"
+			},
+			"par_sf_user": {
+				"type": "string"
+			},
+			"par_sf_db": {
+				"type": "string"
+			},
+			"par_sf_wh": {
+				"type": "string"
+			},
+			"par_sf_role": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Snowflake",
+		"typeProperties": {
+			"authenticationType": "Basic",
+			"connectionString": "jdbc:snowflake://@{linkedService().par_sf_acct}.snowflakecomputing.com/?user=@{linkedService().par_sf_user}&db=@{linkedService().par_sf_db}&warehouse=@{linkedService().par_sf_wh}&role=@{linkedService().par_sf_role}",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "ls_keyvault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "secret-sf-isdc"
+			}
+		},
+		"connectVia": {
+			"referenceName": "irt-adf-isdc",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

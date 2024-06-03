@@ -1,0 +1,12 @@
+{
+	"name": "mpep-adf-snowflake",
+	"properties": {
+		"privateLinkResourceId": "/subscriptions/ae0c1e4e-d49e-4115-b3ba-888d77ea97a3/resourceGroups/azeastus2-privatelink/providers/Microsoft.Network/privateLinkServices/sf-pvlinksvc-azeastus2",
+		"groupId": "",
+		"fqdns": [
+			"uhgdwaas.east-us-2.privatelink.snowflakecomputing.com",
+			"uhg-uhgdwaas.privatelink.snowflakecomputing.com",
+			"ocsp.uhgdwaas.east-us-2.privatelink.snowflakecomputing.com"
+		]
+	}
+}

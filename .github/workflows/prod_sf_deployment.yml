@@ -1,0 +1,16 @@
+name: Deployment SF Prod!
+
+on:
+ workflow_dispatch:
+  
+permissions:
+      id-token: write
+      contents: read
+
+jobs:
+  Snowflake_DW_Database:
+    uses: ./.github/workflows/snowflake.yml
+    with:
+      environment: PROD
+      database: dw_db
+    secrets: inherit

@@ -1,0 +1,39 @@
+{
+	"name": "ls_db2_generic",
+	"properties": {
+		"parameters": {
+			"p_server_name": {
+				"type": "string"
+			},
+			"p_db_name": {
+				"type": "string"
+			},
+			"p_user_name": {
+				"type": "string"
+			},
+			"p_secret_name": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Db2",
+		"typeProperties": {
+			"connectionString": "server=@{linkedService().p_server_name};database=@{linkedService().p_db_name};username=@{linkedService().p_user_name};authenticationType=Basic",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "ls_keyvault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@linkedService().p_secret_name",
+					"type": "Expression"
+				}
+			}
+		},
+		"connectVia": {
+			"referenceName": "shir-adf-isdc",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

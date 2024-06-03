@@ -1,0 +1,39 @@
+{
+	"name": "tr_wf_FWA_PERFORMANT",
+	"properties": {
+		"annotations": [],
+		"runtimeState": "Stopped",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "wf_FWA_PERFORMANT",
+					"type": "PipelineReference"
+				},
+				"parameters": {
+					"p_email_recipient": "isdc_nonprod@ds.uhc.com",
+					"p_util_schema": "UTIL"
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Month",
+				"interval": 1,
+				"startTime": "2024-02-05T02:02:00",
+				"timeZone": "Central Standard Time",
+				"schedule": {
+					"minutes": [
+						0
+					],
+					"hours": [
+						16
+					],
+					"monthDays": [
+						5
+					]
+				}
+			}
+		}
+	}
+}

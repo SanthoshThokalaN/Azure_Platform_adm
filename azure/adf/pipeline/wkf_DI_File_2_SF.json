@@ -1,0 +1,85 @@
+{
+	"name": "wkf_DI_File_2_SF",
+	"properties": {
+		"activities": [
+			{
+				"name": "SP_DI_FILE_2_SF",
+				"type": "Script",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_v2_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_v2_acct": {
+							"value": "@pipeline().globalParameters.par_sf_v2_acct",
+							"type": "Expression"
+						},
+						"par_sf_v2_user": {
+							"value": "@pipeline().globalParameters.par_sf_v2_user",
+							"type": "Expression"
+						},
+						"par_sf_v2_db": {
+							"value": "@pipeline().globalParameters.par_sf_v2_db",
+							"type": "Expression"
+						},
+						"par_sf_v2_wh": {
+							"value": "@pipeline().globalParameters.par_sf_v2_wh",
+							"type": "Expression"
+						},
+						"par_sf_v2_role": {
+							"value": "@pipeline().globalParameters.par_sf_v2_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "NonQuery",
+							"text": {
+								"value": "@concat(\n'CALL ',\npipeline().parameters.p_proc_schema, '.', \n'SP_DI_FILE_2_SF',\n\n'(',   \n\n'''',pipeline().parameters.p_db_name, '''' , ',',\n'''',pipeline().parameters.p_util_schema, '''' , ',', \n'''',pipeline().parameters.p_application, '''' , ',',\n'''',pipeline().parameters.p_workflow_name, '''' , ',',\n'''',pipeline().parameters.p_object_name, '''',\n\n')'\n\n\n)\n",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			}
+		],
+		"parameters": {
+			"p_application": {
+				"type": "string"
+			},
+			"p_workflow_name": {
+				"type": "string"
+			},
+			"p_object_name": {
+				"type": "string"
+			},
+			"p_batch_id": {
+				"type": "string"
+			},
+			"p_util_schema": {
+				"type": "string"
+			},
+			"p_db_name": {
+				"type": "string"
+			},
+			"p_proc_schema": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "DATA_INGESTION/FILES"
+		},
+		"annotations": []
+	}
+}

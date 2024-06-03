@@ -1,0 +1,51 @@
+{
+	"name": "ds_sf_v2_isdc",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sf_v2_isdc",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"par_sf_v2_acct": {
+					"value": "@dataset().par_sf_v2_acct",
+					"type": "Expression"
+				},
+				"par_sf_v2_user": {
+					"value": "@dataset().par_sf_v2_user",
+					"type": "Expression"
+				},
+				"par_sf_v2_db": {
+					"value": "@dataset().par_sf_v2_db",
+					"type": "Expression"
+				},
+				"par_sf_v2_wh": {
+					"value": "@dataset().par_sf_v2_wh",
+					"type": "Expression"
+				},
+				"par_sf_v2_role": {
+					"value": "@dataset().par_sf_v2_role",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"par_sf_v2_acct": {
+				"type": "string"
+			},
+			"par_sf_v2_db": {
+				"type": "string"
+			},
+			"par_sf_v2_user": {
+				"type": "string"
+			},
+			"par_sf_v2_wh": {
+				"type": "string"
+			},
+			"par_sf_v2_role": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "SnowflakeV2Table",
+		"schema": []
+	}
+}

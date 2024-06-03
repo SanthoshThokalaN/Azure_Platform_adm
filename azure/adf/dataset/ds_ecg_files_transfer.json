@@ -1,0 +1,30 @@
+{
+	"name": "ds_ecg_files_transfer",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sftp_ecgpi",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"p_folder_name": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "SftpLocation",
+				"folderPath": {
+					"value": "@dataset().p_folder_name",
+					"type": "Expression"
+				}
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	}
+}

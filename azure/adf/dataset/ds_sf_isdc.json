@@ -1,0 +1,52 @@
+{
+	"name": "ds_sf_isdc",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sf_isdc",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"par_sf_acct": {
+					"value": "@dataset().par_sf_acct",
+					"type": "Expression"
+				},
+				"par_sf_user": {
+					"value": "@dataset().par_sf_user",
+					"type": "Expression"
+				},
+				"par_sf_db": {
+					"value": "@dataset().par_sf_db",
+					"type": "Expression"
+				},
+				"par_sf_wh": {
+					"value": "@dataset().par_sf_wh",
+					"type": "Expression"
+				},
+				"par_sf_role": {
+					"value": "@dataset().par_sf_role",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"par_sf_acct": {
+				"type": "string"
+			},
+			"par_sf_db": {
+				"type": "string"
+			},
+			"par_sf_user": {
+				"type": "string"
+			},
+			"par_sf_wh": {
+				"type": "string"
+			},
+			"par_sf_role": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "SnowflakeTable",
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

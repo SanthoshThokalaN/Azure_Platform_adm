@@ -1,0 +1,1141 @@
+{
+	"name": "tsk_COMPAS_MSG_PLAN_DATA_PULL2",
+	"properties": {
+		"activities": [
+			{
+				"name": "Switch1",
+				"type": "Switch",
+				"dependsOn": [
+					{
+						"activity": "Get_counts",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@string(activity('Get_counts').output.value[0].Query)",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "query1",
+							"activities": [
+								{
+									"name": "Get_individualids",
+									"type": "Lookup",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "SnowflakeSource",
+											"query": {
+												"value": "@concat('select listagg(individualids,'','') as indids from ', \npipeline().globalParameters.par_sf_db,'.',pipeline().parameters.p_lz_compas_schema,'.INDIVIDUAL_IDS_TO_EXTRACT;')\n",
+												"type": "Expression"
+											},
+											"exportSettings": {
+												"type": "SnowflakeExportCopyCommand"
+											}
+										},
+										"dataset": {
+											"referenceName": "ds_sf_isdc",
+											"type": "DatasetReference",
+											"parameters": {
+												"par_sf_acct": {
+													"value": "@pipeline().globalParameters.par_sf_acct",
+													"type": "Expression"
+												},
+												"par_sf_db": {
+													"value": "@pipeline().globalParameters.par_sf_db",
+													"type": "Expression"
+												},
+												"par_sf_user": {
+													"value": "@pipeline().globalParameters.par_sf_user",
+													"type": "Expression"
+												},
+												"par_sf_wh": {
+													"value": "@pipeline().globalParameters.par_sf_wh",
+													"type": "Expression"
+												},
+												"par_sf_role": {
+													"value": "@pipeline().globalParameters.par_sf_role",
+													"type": "Expression"
+												}
+											}
+										}
+									}
+								},
+								{
+									"name": "Get_memberids",
+									"type": "Lookup",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "SnowflakeSource",
+											"query": {
+												"value": "@concat('select listagg(MemberNos,'','') as memids from ',\npipeline().globalParameters.par_sf_db,'.',pipeline().parameters.p_lz_compas_schema,'.MEMBER_NUMBERS_TO_EXTRACT;')",
+												"type": "Expression"
+											},
+											"exportSettings": {
+												"type": "SnowflakeExportCopyCommand"
+											}
+										},
+										"dataset": {
+											"referenceName": "ds_sf_isdc",
+											"type": "DatasetReference",
+											"parameters": {
+												"par_sf_acct": {
+													"value": "@pipeline().globalParameters.par_sf_acct",
+													"type": "Expression"
+												},
+												"par_sf_db": {
+													"value": "@pipeline().globalParameters.par_sf_db",
+													"type": "Expression"
+												},
+												"par_sf_user": {
+													"value": "@pipeline().globalParameters.par_sf_user",
+													"type": "Expression"
+												},
+												"par_sf_wh": {
+													"value": "@pipeline().globalParameters.par_sf_wh",
+													"type": "Expression"
+												},
+												"par_sf_role": {
+													"value": "@pipeline().globalParameters.par_sf_role",
+													"type": "Expression"
+												}
+											}
+										}
+									}
+								},
+								{
+									"name": "Copy data1",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "Get_individualids",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "Get_memberids",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "OracleSource",
+											"oracleReaderQuery": {
+												"value": "@concat('WITH individual_id_cohort AS (\n                SELECT\n                    hm.HOUSEHOLD_ID,\n                    hm.INDIVIDUAL_ID,\n                    hp.MEMBERSHIP_NUMBER,\n                    hp.DELETE_IND,\n                    hm.hhold_member_start_date,\n                    hm.hhold_member_stop_date,\n                    hp.hhold_profile_start_date,\n                    hp.hhold_profile_stop_date\n                FROM COMPAS.HOUSEHOLD_MEMBER hm\n                JOIN COMPAS.HOUSEHOLD_PROFILE hp ON hm.household_id = hp.household_id\n                WHERE hm.HOUSEHOLD_ID IN (\n                        SELECT HOUSEHOLD_ID\n                        FROM COMPAS.HOUSEHOLD_MEMBER\n                        WHERE  (''magic'', INDIVIDUAL_ID) IN (' ,activity('Get_individualids').output.firstRow.indids,'))),\n\n            member_number_cohort AS (\n                SELECT\n                    hm.HOUSEHOLD_ID,\n                    hm.INDIVIDUAL_ID,\n                    hp.MEMBERSHIP_NUMBER,\n                    hp.DELETE_IND,\n                    hm.hhold_member_start_date,\n                    hm.hhold_member_stop_date,\n                    hp.hhold_profile_start_date,\n                    hp.hhold_profile_stop_date\n                FROM COMPAS.HOUSEHOLD_MEMBER hm\n                JOIN COMPAS.HOUSEHOLD_PROFILE hp ON hm.household_id = hp.household_id\n                WHERE hm.HOUSEHOLD_ID IN (\n                        SELECT HOUSEHOLD_ID\n                        FROM COMPAS.HOUSEHOLD_MEMBER\n                        WHERE (''magic'', MEMBERSHIP_NUMBER) IN ( ', activity('Get_memberids').output.firstRow.memids,')))\n\n            SELECT DISTINCT\n                iic.HOUSEHOLD_ID,\n                iic.MEMBERSHIP_NUMBER,\n                COUNT(DISTINCT i.INDIVIDUAL_ID) OVER(PARTITION BY  iic.HOUSEHOLD_ID) as individualCountForHousehold,\n                COUNT (DISTINCT i.EMAIL_ADDR) OVER(PARTITION BY  iic.HOUSEHOLD_ID) as countEmailForHousehold,\n                i.INDIVIDUAL_ID,\n                i.EMAIL_ADDR,\n                pt.PLAN_TYPE_ID\n            FROM COMPAS.INDIVIDUAL i\n            JOIN individual_id_cohort iic ON iic.INDIVIDUAL_ID = i.INDIVIDUAL_ID\n            JOIN COMPAS.INSURED_PLAN ip ON ip.INDIVIDUAL_ID = i.INDIVIDUAL_ID\n            JOIN COMPAS.PLAN p ON p.plan_CD = ip.plan_CD\n            JOIN COMPAS.PLAN_TYPE pt ON pt.PLAN_TYPE_ID = p.PLAN_TYPE_ID\n            WHERE NVL (ip.insured_plan_termination_date, ''31-DEC-9999'') >= SYSDATE\n            AND (EXTRACT(YEAR FROM iic.HHOLD_MEMBER_STOP_DATE) = 9999 OR iic.HHOLD_MEMBER_STOP_DATE >= sysdate)\n            AND (EXTRACT(YEAR FROM iic.HHOLD_PROFILE_STOP_DATE) = 9999 OR iic.HHOLD_PROFILE_STOP_DATE >= sysdate)\n            AND TRUNC (SYSDATE) BETWEEN iic.hhold_member_start_date AND iic.hhold_member_stop_date\n            AND TRUNC (SYSDATE) BETWEEN iic.hhold_profile_start_date AND iic.hhold_profile_stop_date\n            AND iic.DELETE_IND = ''N''\n            AND INSURED_PLAN_EFFECTIVE_DATE <= SYSDATE\n\n            UNION\n\n            SELECT DISTINCT\n                mnc.HOUSEHOLD_ID,\n                mnc.MEMBERSHIP_NUMBER,\n                COUNT(DISTINCT i.INDIVIDUAL_ID) OVER(PARTITION BY  mnc.HOUSEHOLD_ID) as individualCountForHousehold,\n                COUNT (DISTINCT i.EMAIL_ADDR) OVER(PARTITION BY  mnc.HOUSEHOLD_ID) as countEmailForHousehold,\n                i.INDIVIDUAL_ID,\n                i.EMAIL_ADDR,\n                pt.PLAN_TYPE_ID\n            FROM COMPAS.INDIVIDUAL i\n            JOIN member_number_cohort mnc ON mnc.INDIVIDUAL_ID = i.INDIVIDUAL_ID\n            JOIN COMPAS.INSURED_PLAN ip ON ip.INDIVIDUAL_ID = i.INDIVIDUAL_ID\n            JOIN COMPAS.PLAN p ON p.plan_CD = ip.plan_CD\n            JOIN COMPAS.PLAN_TYPE pt ON pt.PLAN_TYPE_ID = p.PLAN_TYPE_ID\n            WHERE NVL (ip.insured_plan_termination_date, ''31-DEC-9999'') >= SYSDATE\n            AND (EXTRACT(YEAR FROM mnc.HHOLD_MEMBER_STOP_DATE) = 9999 OR mnc.HHOLD_MEMBER_STOP_DATE >= sysdate)\n            AND (EXTRACT(YEAR FROM mnc.HHOLD_PROFILE_STOP_DATE) = 9999 OR mnc.HHOLD_PROFILE_STOP_DATE >= sysdate)\n            AND TRUNC (SYSDATE) BETWEEN mnc.hhold_member_start_date AND mnc.hhold_member_stop_date\n            AND TRUNC (SYSDATE) BETWEEN mnc.hhold_profile_start_date AND mnc.hhold_profile_stop_date\n            AND mnc.DELETE_IND = ''N''\n            AND INSURED_PLAN_EFFECTIVE_DATE <= SYSDATE')\n\n",
+												"type": "Expression"
+											},
+											"partitionOption": "None",
+											"convertDecimalToInteger": false,
+											"queryTimeout": "02:00:00"
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"maxRowsPerFile": 100000,
+												"fileNamePrefix": "eft_isdw_import",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "ds_ora_isdw",
+											"type": "DatasetReference"
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "ds_ablob_on_prem_db_to_sf",
+											"type": "DatasetReference",
+											"parameters": {
+												"p_source_name": "isdw",
+												"p_table_name": "eft_isdw_import",
+												"p_env": {
+													"value": "@pipeline().globalParameters.par_env",
+													"type": "Expression"
+												},
+												"p_hotstore_endpoint": {
+													"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "Truncate",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "Copy data1",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "ls_sf_isdc",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"par_sf_acct": {
+												"value": "@pipeline().globalParameters.par_sf_acct",
+												"type": "Expression"
+											},
+											"par_sf_user": {
+												"value": "@pipeline().globalParameters.par_sf_user",
+												"type": "Expression"
+											},
+											"par_sf_db": {
+												"value": "@pipeline().globalParameters.par_sf_db",
+												"type": "Expression"
+											},
+											"par_sf_wh": {
+												"value": "@pipeline().globalParameters.par_sf_wh",
+												"type": "Expression"
+											},
+											"par_sf_role": {
+												"value": "@pipeline().globalParameters.par_sf_role",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"parameters": [
+													{
+														"name": "PIPELINE_ID",
+														"type": "String",
+														"value": {
+															"value": "@pipeline()?.TriggeredByPipelineRunId",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													},
+													{
+														"name": "PIPELINE_NAME",
+														"type": "String",
+														"value": {
+															"value": "@pipeline()?.TriggeredByPipelineName",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													}
+												],
+												"type": "NonQuery",
+												"text": {
+													"value": "@concat('truncate table ', pipeline().globalParameters.par_sf_db,'.',pipeline().parameters.p_lz_isdw_schema,'.EFT_ISDW_IMPORT;')",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "Load",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "Truncate",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "ls_sf_isdc",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"par_sf_acct": {
+												"value": "@pipeline().globalParameters.par_sf_acct",
+												"type": "Expression"
+											},
+											"par_sf_user": {
+												"value": "@pipeline().globalParameters.par_sf_user",
+												"type": "Expression"
+											},
+											"par_sf_db": {
+												"value": "@pipeline().globalParameters.par_sf_db",
+												"type": "Expression"
+											},
+											"par_sf_wh": {
+												"value": "@pipeline().globalParameters.par_sf_wh",
+												"type": "Expression"
+											},
+											"par_sf_role": {
+												"value": "@pipeline().globalParameters.par_sf_role",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"parameters": [
+													{
+														"name": "PIPELINE_ID",
+														"type": "String",
+														"value": {
+															"value": "@pipeline()?.TriggeredByPipelineRunId",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													},
+													{
+														"name": "PIPELINE_NAME",
+														"type": "String",
+														"value": {
+															"value": "@pipeline()?.TriggeredByPipelineName",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													},
+													{
+														"name": "SUB_PROCESS_NAME",
+														"type": "String",
+														"value": "CMP_MSG_PLAN_DATA_PULL3",
+														"direction": "Input"
+													},
+													{
+														"name": "PROCESS_NAME",
+														"type": "String",
+														"value": {
+															"value": "@substring(pipeline()?.TriggeredByPipelineName,3,add(length(pipeline()?.TriggeredByPipelineName), -3))",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													},
+													{
+														"name": "UTIL",
+														"type": "String",
+														"value": {
+															"value": "@pipeline().parameters.p_util_schema",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													},
+													{
+														"name": "DATAFACTORY",
+														"type": "String",
+														"value": {
+															"value": "@pipeline().DataFactory",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													}
+												],
+												"type": "NonQuery",
+												"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								}
+							]
+						},
+						{
+							"value": "query2",
+							"activities": [
+								{
+									"name": "Get_individualidsonly",
+									"type": "Lookup",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "SnowflakeSource",
+											"query": {
+												"value": "@concat('select listagg(individualids,'','') as indids from ', \npipeline().globalParameters.par_sf_db,'.',pipeline().parameters.p_lz_compas_schema,'.INDIVIDUAL_IDS_TO_EXTRACT;')",
+												"type": "Expression"
+											},
+											"exportSettings": {
+												"type": "SnowflakeExportCopyCommand"
+											}
+										},
+										"dataset": {
+											"referenceName": "ds_sf_isdc",
+											"type": "DatasetReference",
+											"parameters": {
+												"par_sf_acct": {
+													"value": "@pipeline().globalParameters.par_sf_acct",
+													"type": "Expression"
+												},
+												"par_sf_db": {
+													"value": "@pipeline().globalParameters.par_sf_db",
+													"type": "Expression"
+												},
+												"par_sf_user": {
+													"value": "@pipeline().globalParameters.par_sf_user",
+													"type": "Expression"
+												},
+												"par_sf_wh": {
+													"value": "@pipeline().globalParameters.par_sf_wh",
+													"type": "Expression"
+												},
+												"par_sf_role": {
+													"value": "@pipeline().globalParameters.par_sf_role",
+													"type": "Expression"
+												}
+											}
+										}
+									}
+								},
+								{
+									"name": "Copy data",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "Get_individualidsonly",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "OracleSource",
+											"oracleReaderQuery": {
+												"value": "@concat('WITH individual_id_cohort AS (\n                SELECT\n                    hm.HOUSEHOLD_ID,\n                    hm.INDIVIDUAL_ID,\n                    hp.MEMBERSHIP_NUMBER,\n                    hp.DELETE_IND,\n                    hm.hhold_member_start_date,\n                    hm.hhold_member_stop_date,\n                    hp.hhold_profile_start_date,\n                    hp.hhold_profile_stop_date\n                FROM COMPAS.HOUSEHOLD_MEMBER hm\n                JOIN COMPAS.HOUSEHOLD_PROFILE hp ON hm.household_id = hp.household_id\n                WHERE hm.HOUSEHOLD_ID IN (\n                        SELECT HOUSEHOLD_ID\n                        FROM COMPAS.HOUSEHOLD_MEMBER\n                        WHERE  (''magic'', INDIVIDUAL_ID) IN (' ,activity('Get_individualidsonly').output.firstRow.indids,')))\n\n            SELECT DISTINCT\n                iic.HOUSEHOLD_ID,\n                iic.MEMBERSHIP_NUMBER,\n                COUNT(DISTINCT i.INDIVIDUAL_ID) OVER(PARTITION BY  iic.HOUSEHOLD_ID) as individualCountForHousehold,\n                COUNT (DISTINCT i.EMAIL_ADDR) OVER(PARTITION BY  iic.HOUSEHOLD_ID) as countEmailForHousehold,\n                i.INDIVIDUAL_ID,\n                i.EMAIL_ADDR,\n                pt.PLAN_TYPE_ID\n            FROM COMPAS.INDIVIDUAL i\n            JOIN individual_id_cohort iic ON iic.INDIVIDUAL_ID = i.INDIVIDUAL_ID\n            JOIN COMPAS.INSURED_PLAN ip ON ip.INDIVIDUAL_ID = i.INDIVIDUAL_ID\n            JOIN COMPAS.PLAN p ON p.plan_CD = ip.plan_CD\n            JOIN COMPAS.PLAN_TYPE pt ON pt.PLAN_TYPE_ID = p.PLAN_TYPE_ID\n            WHERE NVL (ip.insured_plan_termination_date, ''31-DEC-9999'') >= SYSDATE\n            AND (EXTRACT(YEAR FROM iic.HHOLD_MEMBER_STOP_DATE) = 9999 OR iic.HHOLD_MEMBER_STOP_DATE >= sysdate)\n            AND (EXTRACT(YEAR FROM iic.HHOLD_PROFILE_STOP_DATE) = 9999 OR iic.HHOLD_PROFILE_STOP_DATE >= sysdate)\n            AND TRUNC (SYSDATE) BETWEEN iic.hhold_member_start_date AND iic.hhold_member_stop_date\n            AND TRUNC (SYSDATE) BETWEEN iic.hhold_profile_start_date AND iic.hhold_profile_stop_date\n            AND iic.DELETE_IND = ''N''\n            AND INSURED_PLAN_EFFECTIVE_DATE <= SYSDATE')",
+												"type": "Expression"
+											},
+											"partitionOption": "None",
+											"convertDecimalToInteger": false,
+											"queryTimeout": "02:00:00"
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"maxRowsPerFile": 100000,
+												"fileNamePrefix": "eft_isdw_import",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "ds_ora_isdw",
+											"type": "DatasetReference"
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "ds_ablob_on_prem_db_to_sf",
+											"type": "DatasetReference",
+											"parameters": {
+												"p_source_name": "isdw",
+												"p_table_name": "eft_isdw_import",
+												"p_env": {
+													"value": "@pipeline().globalParameters.par_env",
+													"type": "Expression"
+												},
+												"p_hotstore_endpoint": {
+													"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "Truncate EFT_ISDW_IMPORT",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "Copy data",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "ls_sf_isdc",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"par_sf_acct": {
+												"value": "@pipeline().globalParameters.par_sf_acct",
+												"type": "Expression"
+											},
+											"par_sf_user": {
+												"value": "@pipeline().globalParameters.par_sf_user",
+												"type": "Expression"
+											},
+											"par_sf_db": {
+												"value": "@pipeline().globalParameters.par_sf_db",
+												"type": "Expression"
+											},
+											"par_sf_wh": {
+												"value": "@pipeline().globalParameters.par_sf_wh",
+												"type": "Expression"
+											},
+											"par_sf_role": {
+												"value": "@pipeline().globalParameters.par_sf_role",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"parameters": [
+													{
+														"name": "PIPELINE_ID",
+														"type": "String",
+														"value": {
+															"value": "@pipeline()?.TriggeredByPipelineRunId",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													},
+													{
+														"name": "PIPELINE_NAME",
+														"type": "String",
+														"value": {
+															"value": "@pipeline()?.TriggeredByPipelineName",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													}
+												],
+												"type": "NonQuery",
+												"text": {
+													"value": "@concat('truncate table ', pipeline().globalParameters.par_sf_db,'.',pipeline().parameters.p_lz_isdw_schema,'.EFT_ISDW_IMPORT;')",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "Load EFT_ISDW_IMPORT",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "Truncate EFT_ISDW_IMPORT",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "ls_sf_isdc",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"par_sf_acct": {
+												"value": "@pipeline().globalParameters.par_sf_acct",
+												"type": "Expression"
+											},
+											"par_sf_user": {
+												"value": "@pipeline().globalParameters.par_sf_user",
+												"type": "Expression"
+											},
+											"par_sf_db": {
+												"value": "@pipeline().globalParameters.par_sf_db",
+												"type": "Expression"
+											},
+											"par_sf_wh": {
+												"value": "@pipeline().globalParameters.par_sf_wh",
+												"type": "Expression"
+											},
+											"par_sf_role": {
+												"value": "@pipeline().globalParameters.par_sf_role",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"parameters": [
+													{
+														"name": "PIPELINE_ID",
+														"type": "String",
+														"value": {
+															"value": "@pipeline()?.TriggeredByPipelineRunId",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													},
+													{
+														"name": "PIPELINE_NAME",
+														"type": "String",
+														"value": {
+															"value": "@pipeline()?.TriggeredByPipelineName",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													},
+													{
+														"name": "SUB_PROCESS_NAME",
+														"type": "String",
+														"value": "CMP_MSG_PLAN_DATA_PULL3",
+														"direction": "Input"
+													},
+													{
+														"name": "PROCESS_NAME",
+														"type": "String",
+														"value": {
+															"value": "@substring(pipeline()?.TriggeredByPipelineName,3,add(length(pipeline()?.TriggeredByPipelineName), -3))",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													},
+													{
+														"name": "UTIL",
+														"type": "String",
+														"value": {
+															"value": "@pipeline().parameters.p_util_schema",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													},
+													{
+														"name": "DATAFACTORY",
+														"type": "String",
+														"value": {
+															"value": "@pipeline().DataFactory",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													}
+												],
+												"type": "NonQuery",
+												"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								}
+							]
+						},
+						{
+							"value": "query3",
+							"activities": [
+								{
+									"name": "Get_memberidsonly",
+									"type": "Lookup",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "SnowflakeSource",
+											"query": {
+												"value": "@concat('select listagg(MemberNos,'','') as memids from ',\npipeline().globalParameters.par_sf_db,'.',pipeline().parameters.p_lz_compas_schema,'.MEMBER_NUMBERS_TO_EXTRACT;')",
+												"type": "Expression"
+											},
+											"exportSettings": {
+												"type": "SnowflakeExportCopyCommand"
+											}
+										},
+										"dataset": {
+											"referenceName": "ds_sf_isdc",
+											"type": "DatasetReference",
+											"parameters": {
+												"par_sf_acct": {
+													"value": "@pipeline().globalParameters.par_sf_acct",
+													"type": "Expression"
+												},
+												"par_sf_db": {
+													"value": "@pipeline().globalParameters.par_sf_db",
+													"type": "Expression"
+												},
+												"par_sf_user": {
+													"value": "@pipeline().globalParameters.par_sf_user",
+													"type": "Expression"
+												},
+												"par_sf_wh": {
+													"value": "@pipeline().globalParameters.par_sf_wh",
+													"type": "Expression"
+												},
+												"par_sf_role": {
+													"value": "@pipeline().globalParameters.par_sf_role",
+													"type": "Expression"
+												}
+											}
+										}
+									}
+								},
+								{
+									"name": "Copy data membersonly",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "Get_memberidsonly",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "OracleSource",
+											"oracleReaderQuery": {
+												"value": "@concat('WITH member_number_cohort AS (\n                SELECT\n                    hm.HOUSEHOLD_ID,\n                    hm.INDIVIDUAL_ID,\n                    hp.MEMBERSHIP_NUMBER,\n                    hp.DELETE_IND,\n                    hm.hhold_member_start_date,\n                    hm.hhold_member_stop_date,\n                    hp.hhold_profile_start_date,\n                    hp.hhold_profile_stop_date\n                FROM COMPAS.HOUSEHOLD_MEMBER hm\n                JOIN COMPAS.HOUSEHOLD_PROFILE hp ON hm.household_id = hp.household_id\n                WHERE hm.HOUSEHOLD_ID IN (\n                        SELECT HOUSEHOLD_ID\n                        FROM COMPAS.HOUSEHOLD_PROFILE\n                        WHERE (''magic'', MEMBERSHIP_NUMBER) IN ( ', activity('Get_memberidsonly').output.firstRow.memids,')))\n\n            SELECT DISTINCT\n                mnc.HOUSEHOLD_ID,\n                mnc.MEMBERSHIP_NUMBER,\n                COUNT(DISTINCT i.INDIVIDUAL_ID) OVER(PARTITION BY  mnc.HOUSEHOLD_ID) as individualCountForHousehold,\n                COUNT (DISTINCT i.EMAIL_ADDR) OVER(PARTITION BY  mnc.HOUSEHOLD_ID) as countEmailForHousehold,\n                i.INDIVIDUAL_ID,\n                i.EMAIL_ADDR,\n                pt.PLAN_TYPE_ID\n            FROM COMPAS.INDIVIDUAL i\n            JOIN member_number_cohort mnc ON mnc.INDIVIDUAL_ID = i.INDIVIDUAL_ID\n            JOIN COMPAS.INSURED_PLAN ip ON ip.INDIVIDUAL_ID = i.INDIVIDUAL_ID\n            JOIN COMPAS.PLAN p ON p.plan_CD = ip.plan_CD\n            JOIN COMPAS.PLAN_TYPE pt ON pt.PLAN_TYPE_ID = p.PLAN_TYPE_ID\n            WHERE NVL (ip.insured_plan_termination_date, ''31-DEC-9999'') >= SYSDATE\n            AND (EXTRACT(YEAR FROM mnc.HHOLD_MEMBER_STOP_DATE) = 9999 OR mnc.HHOLD_MEMBER_STOP_DATE >= sysdate)\n            AND (EXTRACT(YEAR FROM mnc.HHOLD_PROFILE_STOP_DATE) = 9999 OR mnc.HHOLD_PROFILE_STOP_DATE >= sysdate)\n            AND TRUNC (SYSDATE) BETWEEN mnc.hhold_member_start_date AND mnc.hhold_member_stop_date\n            AND TRUNC (SYSDATE) BETWEEN mnc.hhold_profile_start_date AND mnc.hhold_profile_stop_date\n            AND mnc.DELETE_IND = ''N''\n            AND INSURED_PLAN_EFFECTIVE_DATE <= SYSDATE')\n",
+												"type": "Expression"
+											},
+											"partitionOption": "None",
+											"convertDecimalToInteger": false,
+											"queryTimeout": "02:00:00"
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"maxRowsPerFile": 100000,
+												"fileNamePrefix": "eft_isdw_import",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "ds_ora_isdw",
+											"type": "DatasetReference"
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "ds_ablob_on_prem_db_to_sf",
+											"type": "DatasetReference",
+											"parameters": {
+												"p_source_name": "isdw",
+												"p_table_name": "eft_isdw_import",
+												"p_env": {
+													"value": "@pipeline().globalParameters.par_env",
+													"type": "Expression"
+												},
+												"p_hotstore_endpoint": {
+													"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "Truncate EFT_ISDW_IMPORT membersonly",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "Copy data membersonly",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "ls_sf_isdc",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"par_sf_acct": {
+												"value": "@pipeline().globalParameters.par_sf_acct",
+												"type": "Expression"
+											},
+											"par_sf_user": {
+												"value": "@pipeline().globalParameters.par_sf_user",
+												"type": "Expression"
+											},
+											"par_sf_db": {
+												"value": "@pipeline().globalParameters.par_sf_db",
+												"type": "Expression"
+											},
+											"par_sf_wh": {
+												"value": "@pipeline().globalParameters.par_sf_wh",
+												"type": "Expression"
+											},
+											"par_sf_role": {
+												"value": "@pipeline().globalParameters.par_sf_role",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"parameters": [
+													{
+														"name": "PIPELINE_ID",
+														"type": "String",
+														"value": {
+															"value": "@pipeline()?.TriggeredByPipelineRunId",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													},
+													{
+														"name": "PIPELINE_NAME",
+														"type": "String",
+														"value": {
+															"value": "@pipeline()?.TriggeredByPipelineName",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													}
+												],
+												"type": "NonQuery",
+												"text": {
+													"value": "@concat('truncate table ', pipeline().globalParameters.par_sf_db,'.',pipeline().parameters.p_lz_isdw_schema,'.EFT_ISDW_IMPORT;')",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "Load_EFT_ISDW_IMPORT membersonly",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "Truncate EFT_ISDW_IMPORT membersonly",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "ls_sf_isdc",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"par_sf_acct": {
+												"value": "@pipeline().globalParameters.par_sf_acct",
+												"type": "Expression"
+											},
+											"par_sf_user": {
+												"value": "@pipeline().globalParameters.par_sf_user",
+												"type": "Expression"
+											},
+											"par_sf_db": {
+												"value": "@pipeline().globalParameters.par_sf_db",
+												"type": "Expression"
+											},
+											"par_sf_wh": {
+												"value": "@pipeline().globalParameters.par_sf_wh",
+												"type": "Expression"
+											},
+											"par_sf_role": {
+												"value": "@pipeline().globalParameters.par_sf_role",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"parameters": [
+													{
+														"name": "PIPELINE_ID",
+														"type": "String",
+														"value": {
+															"value": "@pipeline()?.TriggeredByPipelineRunId",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													},
+													{
+														"name": "PIPELINE_NAME",
+														"type": "String",
+														"value": {
+															"value": "@pipeline()?.TriggeredByPipelineName",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													},
+													{
+														"name": "SUB_PROCESS_NAME",
+														"type": "String",
+														"value": "CMP_MSG_PLAN_DATA_PULL3",
+														"direction": "Input"
+													},
+													{
+														"name": "PROCESS_NAME",
+														"type": "String",
+														"value": {
+															"value": "@substring(pipeline()?.TriggeredByPipelineName,3,add(length(pipeline()?.TriggeredByPipelineName), -3))",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													},
+													{
+														"name": "UTIL",
+														"type": "String",
+														"value": {
+															"value": "@pipeline().parameters.p_util_schema",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													},
+													{
+														"name": "DATAFACTORY",
+														"type": "String",
+														"value": {
+															"value": "@pipeline().DataFactory",
+															"type": "Expression"
+														},
+														"direction": "Input"
+													}
+												],
+												"type": "NonQuery",
+												"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								}
+							]
+						}
+					],
+					"defaultActivities": [
+						{
+							"name": "Set variable1",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "one",
+								"value": "two"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get_counts",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SnowflakeSource",
+						"query": {
+							"value": "@concat('select\ncase when membercount >0 and individualcount>0 then ''query1''\nwhen membercount =0 and individualcount>0 then ''query2''\nwhen membercount >0 and individualcount=0 then ''query3'' end as query from(\nselect (select count(*) as membercount from ', \npipeline().globalParameters.par_sf_db,'.',pipeline().parameters.p_lz_compas_schema,'.MEMBER_NUMBERS_TO_EXTRACT) as membercount, (select count(*) as individualcount from ', \npipeline().globalParameters.par_sf_db,'.',pipeline().parameters.p_lz_compas_schema,'.INDIVIDUAL_IDS_TO_EXTRACT) as individualcount\n)')",
+							"type": "Expression"
+						},
+						"exportSettings": {
+							"type": "SnowflakeExportCopyCommand"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_sf_isdc",
+						"type": "DatasetReference",
+						"parameters": {
+							"par_sf_acct": {
+								"value": "@pipeline().globalParameters.par_sf_acct",
+								"type": "Expression"
+							},
+							"par_sf_db": {
+								"value": "@pipeline().globalParameters.par_sf_db",
+								"type": "Expression"
+							},
+							"par_sf_user": {
+								"value": "@pipeline().globalParameters.par_sf_user",
+								"type": "Expression"
+							},
+							"par_sf_wh": {
+								"value": "@pipeline().globalParameters.par_sf_wh",
+								"type": "Expression"
+							},
+							"par_sf_role": {
+								"value": "@pipeline().globalParameters.par_sf_role",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			}
+		],
+		"parameters": {
+			"p_util_schema": {
+				"type": "string"
+			},
+			"p_compas_schema": {
+				"type": "string"
+			},
+			"p_lz_compas_schema": {
+				"type": "string"
+			},
+			"p_src_compas_schema": {
+				"type": "string"
+			},
+			"p_lz_isdw_schema": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"one": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "PRE_CLM/Tasks"
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-03-07T00:21:33Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

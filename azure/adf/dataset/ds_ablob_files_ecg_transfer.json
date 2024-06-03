@@ -1,0 +1,43 @@
+{
+	"name": "ds_ablob_files_ecg_transfer",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_ablob_isdc",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"p_hotstore_endpoint": {
+					"value": "@dataset().p_hotstore_endpoint",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"p_folder_name": {
+				"type": "string"
+			},
+			"p_hotstore_endpoint": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"folderPath": {
+					"value": "@dataset().p_folder_name",
+					"type": "Expression"
+				},
+				"container": {
+					"value": "isdc",
+					"type": "Expression"
+				}
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	}
+}

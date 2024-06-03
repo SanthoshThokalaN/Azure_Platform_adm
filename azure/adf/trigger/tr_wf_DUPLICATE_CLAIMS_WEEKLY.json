@@ -1,0 +1,63 @@
+{
+	"name": "tr_wf_DUPLICATE_CLAIMS_WEEKLY",
+	"properties": {
+		"annotations": [],
+		"runtimeState": "Stopped",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "wf_DUPLICATE_CLAIMS",
+					"type": "PipelineReference"
+				},
+				"parameters": {
+					"p_email_recipient": "isdc_nonprod@ds.uhc.com",
+					"p_util_schema": "UTIL",
+					"p_fox_schema": "fox_app",
+					"p_lz_fox_schema": "LZ_FOX",
+					"p_email_receipent_client": [
+						{
+							"emailAddress": {
+								"address": "IS_EDP_Dev_Team@ds.uhc.com"
+							}
+						},
+						{
+							"emailAddress": {
+								"address": "nicole_marzahl@uhc.com"
+							}
+						},
+						{
+							"emailAddress": {
+								"address": "necole_d_blocker@uhc.com"
+							}
+						},
+						{
+							"emailAddress": {
+								"address": "robin_j_marzahl@uhc.com"
+							}
+						}
+					]
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Week",
+				"interval": 1,
+				"startTime": "2024-04-03T16:56:00",
+				"timeZone": "Central Standard Time",
+				"schedule": {
+					"minutes": [
+						0
+					],
+					"hours": [
+						16
+					],
+					"weekDays": [
+						"Saturday"
+					]
+				}
+			}
+		}
+	}
+}

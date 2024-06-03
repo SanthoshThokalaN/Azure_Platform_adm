@@ -1,0 +1,44 @@
+{
+	"name": "ds_db2_generic",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_db2_generic",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"p_server_name": {
+					"value": "@dataset().p_server_name",
+					"type": "Expression"
+				},
+				"p_db_name": {
+					"value": "@dataset().p_db_name",
+					"type": "Expression"
+				},
+				"p_user_name": {
+					"value": "@dataset().p_user_name",
+					"type": "Expression"
+				},
+				"p_secret_name": {
+					"value": "@dataset().p_secret_name",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"p_server_name": {
+				"type": "string"
+			},
+			"p_db_name": {
+				"type": "string"
+			},
+			"p_user_name": {
+				"type": "string"
+			},
+			"p_secret_name": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Db2Table",
+		"schema": []
+	}
+}

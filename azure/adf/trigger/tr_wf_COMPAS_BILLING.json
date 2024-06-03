@@ -1,0 +1,45 @@
+{
+	"name": "tr_wf_COMPAS_BILLING",
+	"properties": {
+		"annotations": [],
+		"runtimeState": "Stopped",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "wf_COMPAS_BILLING",
+					"type": "PipelineReference"
+				},
+				"parameters": {
+					"p_email_recipient": "isdc_nonprod@ds.uhc.com",
+					"p_util_schema": "UTIL",
+					"p_lz_compas_schema": "LZ_COMPAS"
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Week",
+				"interval": 1,
+				"startTime": "2024-02-08T20:18:00",
+				"timeZone": "Central Standard Time",
+				"schedule": {
+					"minutes": [
+						30
+					],
+					"hours": [
+						5
+					],
+					"weekDays": [
+						"Tuesday",
+						"Wednesday",
+						"Thursday",
+						"Friday",
+						"Saturday",
+						"Sunday"
+					]
+				}
+			}
+		}
+	}
+}

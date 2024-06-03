@@ -1,0 +1,315 @@
+{
+	"name": "wkf_Smart_2_SF",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get_Object_Metadata",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SnowflakeV2Source",
+						"query": {
+							"value": "@concat('select\nA.APP_SOURCE,  \nA.APP_SOURCE_TYPE,\nA.APP_HOST,\nA.APP_PORT,\nA.APP_SERVICE_NAME,\nA.APP_USER_NAME,\nA.APP_AKV_SECRET_NAME ,\nA.APP_COLUMN_LIST,\nA.APP_SCHEMA,\nA.APP_OBJECT_NAME,\nA.OBJECT_NAME,\n\n\nCASE WHEN A.INCR_INDC = ''Y'' THEN ''WHERE ''||INCR_COLUMN|| '' >= CURRENT_TIMESTAMP - ''|| ETL_EXTRACT_CAP_MINS || '' MINUTES ''\nELSE '' '' END AS WHERE_CLAUSE\n\n\n\n\nFROM ', pipeline().parameters.p_util_schema, \n\n'.ETL_BATCH_OBJECT_CONTROL  A \n\n\n\nWHERE \nA.APPLICATION = ''', pipeline().parameters.p_application, '''\n AND A.WORKFLOW_NAME = ''',pipeline().parameters.p_workflow_name, ''' AND A.OBJECT_NAME = ''', pipeline().parameters.p_object_name, '''')\n",
+							"type": "Expression"
+						},
+						"exportSettings": {
+							"type": "SnowflakeExportCopyCommand"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_sf_v2_isdc",
+						"type": "DatasetReference",
+						"parameters": {
+							"par_sf_v2_acct": {
+								"value": "@pipeline().globalParameters.par_sf_v2_acct",
+								"type": "Expression"
+							},
+							"par_sf_v2_db": {
+								"value": "@pipeline().globalParameters.par_sf_v2_db",
+								"type": "Expression"
+							},
+							"par_sf_v2_user": {
+								"value": "@pipeline().globalParameters.par_sf_v2_user",
+								"type": "Expression"
+							},
+							"par_sf_v2_wh": {
+								"value": "@pipeline().globalParameters.par_sf_v2_wh",
+								"type": "Expression"
+							},
+							"par_sf_v2_role": {
+								"value": "@pipeline().globalParameters.par_sf_v2_role",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": true
+				}
+			},
+			{
+				"name": "Stage_Db2_Data_to_Blob",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Get_Object_Metadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Batch_Id",
+						"value": "@pipeline().parameters.p_batch_id"
+					},
+					{
+						"name": "Object_Name",
+						"value": "@pipeline().parameters.p_object_name"
+					}
+				],
+				"typeProperties": {
+					"source": {
+						"type": "Db2Source",
+						"query": {
+							"value": "@concat('SELECT ', activity('Get_Object_Metadata').output.firstRow.APP_COLUMN_LIST, ' FROM ', activity('Get_Object_Metadata').output.firstRow.APP_SCHEMA, '.', activity('Get_Object_Metadata').output.firstRow.APP_OBJECT_NAME, ' ', activity('Get_Object_Metadata').output.firstRow.WHERE_CLAUSE, ' FOR READ ONLY WITH UR ')",
+							"type": "Expression"
+						}
+					},
+					"sink": {
+						"type": "ParquetSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "ParquetWriteSettings",
+							"maxRowsPerFile": 100000,
+							"fileNamePrefix": {
+								"value": "@toLower(activity('Get_Object_Metadata').output.firstRow.OBJECT_NAME)",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_db2_generic",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_server_name": {
+								"value": "@activity('Get_Object_Metadata').output.firstRow.APP_HOST",
+								"type": "Expression"
+							},
+							"p_db_name": {
+								"value": "@activity('Get_Object_Metadata').output.firstRow.APP_SERVICE_NAME",
+								"type": "Expression"
+							},
+							"p_user_name": {
+								"value": "@activity('Get_Object_Metadata').output.firstRow.APP_USER_NAME",
+								"type": "Expression"
+							},
+							"p_secret_name": {
+								"value": "@activity('Get_Object_Metadata').output.firstRow.APP_AKV_SECRET_NAME",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_ablob_data_replication",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_source_name": {
+								"value": "@toLower(activity('Get_Object_Metadata').output.firstRow.APP_SOURCE)",
+								"type": "Expression"
+							},
+							"p_schema_name": {
+								"value": "@toLower(activity('Get_Object_Metadata').output.firstRow.APP_SCHEMA)",
+								"type": "Expression"
+							},
+							"p_table_name": {
+								"value": "@toLower(activity('Get_Object_Metadata').output.firstRow.OBJECT_NAME)",
+								"type": "Expression"
+							},
+							"p_env": {
+								"value": "@pipeline().globalParameters.par_env",
+								"type": "Expression"
+							},
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "SP_REP_SMART_2_SF",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Stage_Db2_Data_to_Blob",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_v2_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_v2_acct": {
+							"value": "@pipeline().globalParameters.par_sf_v2_acct",
+							"type": "Expression"
+						},
+						"par_sf_v2_user": {
+							"value": "@pipeline().globalParameters.par_sf_v2_user",
+							"type": "Expression"
+						},
+						"par_sf_v2_db": {
+							"value": "@pipeline().globalParameters.par_sf_v2_db",
+							"type": "Expression"
+						},
+						"par_sf_v2_wh": {
+							"value": "@pipeline().globalParameters.par_sf_v2_wh",
+							"type": "Expression"
+						},
+						"par_sf_v2_role": {
+							"value": "@pipeline().globalParameters.par_sf_v2_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "NonQuery",
+							"text": {
+								"value": "@concat(\n'CALL ',\npipeline().parameters.p_proc_schema, '.', \n'SP_REP_SMART_2_SF',\n\n'(',   \n\n'''',pipeline().parameters.p_db_name, '''' , ',',\n'''',pipeline().parameters.p_util_schema, '''' , ',', \n'''',pipeline().parameters.p_application, '''' , ',',\n'''',pipeline().parameters.p_workflow_name, '''' , ',',\n'''',pipeline().parameters.p_object_name, '''',\n\n')'\n\n\n)\n",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Log_Copy_Failure",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Stage_Db2_Data_to_Blob",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_v2_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_v2_acct": {
+							"value": "@pipeline().globalParameters.par_sf_v2_acct",
+							"type": "Expression"
+						},
+						"par_sf_v2_user": {
+							"value": "@pipeline().globalParameters.par_sf_v2_user",
+							"type": "Expression"
+						},
+						"par_sf_v2_db": {
+							"value": "@pipeline().globalParameters.par_sf_v2_db",
+							"type": "Expression"
+						},
+						"par_sf_v2_wh": {
+							"value": "@pipeline().globalParameters.par_sf_v2_wh",
+							"type": "Expression"
+						},
+						"par_sf_v2_role": {
+							"value": "@pipeline().globalParameters.par_sf_v2_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "NonQuery",
+							"text": {
+								"value": "@concat(\n'CALL ',\npipeline().parameters.p_util_schema, '.', \n'SP_BATCH_OBJECT_COPY_DATA_POST_FAILURE',\n\n'(',   \n\n'''',pipeline().parameters.p_db_name, '''' , ',',\n'''',pipeline().parameters.p_util_schema, '''' , ',', \n'''',pipeline().parameters.p_application, '''' , ',',\n'''',pipeline().parameters.p_workflow_name, '''' , ',',\n'''',pipeline().parameters.p_object_name, '''', ',',\n'''',replace(string(activity('Stage_Db2_Data_to_Blob').error?.message), '''', ''), '''',\n\n')'\n\n\n)",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			}
+		],
+		"parameters": {
+			"p_application": {
+				"type": "string"
+			},
+			"p_workflow_name": {
+				"type": "string"
+			},
+			"p_object_name": {
+				"type": "string"
+			},
+			"p_batch_id": {
+				"type": "string"
+			},
+			"p_util_schema": {
+				"type": "string"
+			},
+			"p_db_name": {
+				"type": "string"
+			},
+			"p_proc_schema": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "DATA_REPLICATION"
+		},
+		"annotations": []
+	}
+}

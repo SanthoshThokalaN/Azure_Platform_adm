@@ -1,0 +1,1470 @@
+{
+	"name": "tsk_COMPAS_BILLING",
+	"properties": {
+		"activities": [
+			{
+				"name": "Until the DAT File",
+				"type": "Until",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@bool(variables('v_dat_file_exists'))",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Get Dat File Metadata",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 300,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "ds_ablob_files",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/landing/compas_billing/')",
+											"type": "Expression"
+										},
+										"p_file_name": "*.DAT",
+										"p_hotstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"childItems"
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							}
+						},
+						{
+							"name": "If Dat File Exists",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Get Dat File Metadata",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@greater(length(activity('Get Dat File Metadata').output.childItems), 0)",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Wait 10 minutes",
+										"type": "Wait",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"waitTimeInSeconds": 600
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Set variable true",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "v_dat_file_exists",
+											"value": true
+										}
+									}
+								]
+							}
+						}
+					],
+					"timeout": "0.01:00:00"
+				}
+			},
+			{
+				"name": "Delete the other files from landing",
+				"type": "Delete",
+				"dependsOn": [
+					{
+						"activity": "Delete the files for nocprot from inbox",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/landing/compas_billing')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"wildcardFileName": {
+							"value": "@{concat('*.DAT')}",
+							"type": "Expression"
+						},
+						"enablePartitionDiscovery": false
+					}
+				}
+			},
+			{
+				"name": "Load table lz Dallas",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Truncate COMPAS Stg Table",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": "@pipeline().globalParameters.par_sf_acct",
+						"par_sf_user": "@pipeline().globalParameters.par_sf_user",
+						"par_sf_db": "@pipeline().globalParameters.par_sf_db",
+						"par_sf_wh": "@pipeline().globalParameters.par_sf_wh",
+						"par_sf_role": "@pipeline().globalParameters.par_sf_role"
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING_DALLAS",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING",
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Truncate COMPAS Stg Table",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Delete the other files from landing",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": {
+								"value": "@concat('TRUNCATE TABLE ',pipeline().parameters.p_lz_compas_schema,'.COMPAS_BILLING_RAW_DALLAS;',\n'TRUNCATE TABLE ',pipeline().parameters.p_lz_compas_schema, '.COMPAS_BILLING_RAW_EFTAUTH;',\n'TRUNCATE TABLE ',pipeline().parameters.p_lz_compas_schema, '.COMPAS_BILLING_RAW_JPMCEFTD;',\n'TRUNCATE TABLE ',pipeline().parameters.p_lz_compas_schema, '.COMPAS_BILLING_RAW_JPMCEFTM;',\n'TRUNCATE TABLE ',pipeline().parameters.p_lz_compas_schema, '.COMPAS_BILLING_RAW_NOC;',\n'TRUNCATE TABLE ',pipeline().parameters.p_lz_compas_schema, '.COMPAS_BILLING_RAW_PITTS;',\n'TRUNCATE TABLE ',pipeline().parameters.p_lz_compas_schema, '.COMPAS_BILLING_RAW_PROT;',\n'TRUNCATE TABLE ',pipeline().parameters.p_lz_compas_schema, '.COMPAS_BILLING_RAW_THDPARTY;')",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Load table lz EFTAUTH",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Load table lz Dallas",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": "@pipeline().globalParameters.par_sf_acct",
+						"par_sf_user": "@pipeline().globalParameters.par_sf_user",
+						"par_sf_db": "@pipeline().globalParameters.par_sf_db",
+						"par_sf_wh": "@pipeline().globalParameters.par_sf_wh",
+						"par_sf_role": "@pipeline().globalParameters.par_sf_role"
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING_EFTAUTH",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING",
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Load table lz THDPARTY",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Load table lz PROT",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": "@pipeline().globalParameters.par_sf_acct",
+						"par_sf_user": "@pipeline().globalParameters.par_sf_user",
+						"par_sf_db": "@pipeline().globalParameters.par_sf_db",
+						"par_sf_wh": "@pipeline().globalParameters.par_sf_wh",
+						"par_sf_role": "@pipeline().globalParameters.par_sf_role"
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING_THDPARTY",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING",
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Load table lz JPMCEFTM",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Load table lz JPMCEFTD",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": "@pipeline().globalParameters.par_sf_acct",
+						"par_sf_user": "@pipeline().globalParameters.par_sf_user",
+						"par_sf_db": "@pipeline().globalParameters.par_sf_db",
+						"par_sf_wh": "@pipeline().globalParameters.par_sf_wh",
+						"par_sf_role": "@pipeline().globalParameters.par_sf_role"
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING_JPMCEFTM",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING",
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Load table lz JPMCEFTD",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Load table lz EFTAUTH",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": "@pipeline().globalParameters.par_sf_acct",
+						"par_sf_user": "@pipeline().globalParameters.par_sf_user",
+						"par_sf_db": "@pipeline().globalParameters.par_sf_db",
+						"par_sf_wh": "@pipeline().globalParameters.par_sf_wh",
+						"par_sf_role": "@pipeline().globalParameters.par_sf_role"
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING_JPMCEFTD",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING",
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Load table lz NOC",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Load table lz JPMCEFTM",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": "@pipeline().globalParameters.par_sf_acct",
+						"par_sf_user": "@pipeline().globalParameters.par_sf_user",
+						"par_sf_db": "@pipeline().globalParameters.par_sf_db",
+						"par_sf_wh": "@pipeline().globalParameters.par_sf_wh",
+						"par_sf_role": "@pipeline().globalParameters.par_sf_role"
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING_NOC",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING",
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Load table lz PITTS",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Load table lz NOC",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": "@pipeline().globalParameters.par_sf_acct",
+						"par_sf_user": "@pipeline().globalParameters.par_sf_user",
+						"par_sf_db": "@pipeline().globalParameters.par_sf_db",
+						"par_sf_wh": "@pipeline().globalParameters.par_sf_wh",
+						"par_sf_role": "@pipeline().globalParameters.par_sf_role"
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING_PITTS",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING",
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Load table lz PROT",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Load table lz PITTS",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": "@pipeline().globalParameters.par_sf_acct",
+						"par_sf_user": "@pipeline().globalParameters.par_sf_user",
+						"par_sf_db": "@pipeline().globalParameters.par_sf_db",
+						"par_sf_wh": "@pipeline().globalParameters.par_sf_wh",
+						"par_sf_role": "@pipeline().globalParameters.par_sf_role"
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING_PROT",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING",
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Move Files from Inbox to Hot Archive",
+				"description": "Move Files from Inbox to Hot Archive",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Load table lz THDPARTY",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"wildcardFolderPath": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing')",
+								"type": "Expression"
+							},
+							"wildcardFileName": {
+								"value": "@{concat('*.DAT')}",
+								"type": "Expression"
+							},
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/archive/')\n\n",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Move Files from Inbox to Cold Archive",
+				"description": "Move Files from Inbox to Cold Archive",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Move Files from Inbox to Hot Archive",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"wildcardFolderPath": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing')",
+								"type": "Expression"
+							},
+							"wildcardFileName": {
+								"value": "@{concat('*.DAT')}",
+								"type": "Expression"
+							},
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_cold_archive",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/compas_billing/', \n\nconcat(formatDateTime(convertTimeZone(utcnow(), 'UTC', 'Central Standard Time'), 'yyyy'),\n\nformatDateTime(convertTimeZone(utcnow(), 'UTC', 'Central Standard Time'),'MM'),\n\nformatDateTime(convertTimeZone(utcnow(), 'UTC', 'Central Standard Time'),'dd')),'/') ",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_coldstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_coldstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Delete the files from Inbox",
+				"type": "Delete",
+				"dependsOn": [
+					{
+						"activity": "Move Files from Inbox to Cold Archive",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"wildcardFileName": {
+							"value": "@{concat('*.DAT')}",
+							"type": "Expression"
+						},
+						"enablePartitionDiscovery": false
+					}
+				}
+			},
+			{
+				"name": "Move Files nocprot to archive",
+				"description": "Move Files from Landing to Inbox",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Move Files from Landing to Inbox",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Source",
+						"value": "isdc/@{concat(pipeline().globalParameters.par_env, '/landing/compas_billing/')}/@{'*.DAT'}"
+					},
+					{
+						"name": "Destination",
+						"value": "isdc/@{concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing/')}/@{' '}"
+					}
+				],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"wildcardFolderPath": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing')",
+								"type": "Expression"
+							},
+							"wildcardFileName": {
+								"value": "@concat('NOCPROT*.DAT')",
+								"type": "Expression"
+							},
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/compas_billing/', \n\nconcat(formatDateTime(convertTimeZone(utcnow(), 'UTC', 'Central Standard Time'), 'yyyy'),\n\nformatDateTime(convertTimeZone(utcnow(), 'UTC', 'Central Standard Time'),'MM'),\n\nformatDateTime(convertTimeZone(utcnow(), 'UTC', 'Central Standard Time'),'dd')),'/') ",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_coldstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Delete the files for nocprot from inbox",
+				"type": "Delete",
+				"dependsOn": [
+					{
+						"activity": "Move Files nocprot to archive",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"wildcardFileName": {
+							"value": "@{concat('NOCPROT*.DAT')}",
+							"type": "Expression"
+						},
+						"enablePartitionDiscovery": false
+					}
+				}
+			},
+			{
+				"name": "Move Files from Landing to Inbox",
+				"description": "Move Files from Landing to Inbox",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Until the DAT File",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Source",
+						"value": "isdc/@{concat(pipeline().globalParameters.par_env, '/landing/compas_billing/')}/@{'*.DAT'}"
+					},
+					{
+						"name": "Destination",
+						"value": "isdc/@{concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing/')}/@{' '}"
+					}
+				],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"wildcardFolderPath": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/landing/compas_billing/')",
+								"type": "Expression"
+							},
+							"wildcardFileName": {
+								"value": "@concat('*.DAT')",
+								"type": "Expression"
+							},
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/landing/compas_billing/')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			}
+		],
+		"parameters": {
+			"p_util_schema": {
+				"type": "string"
+			},
+			"p_lz_compas_schema": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"v_dat_file_exists": {
+				"type": "Boolean",
+				"defaultValue": false
+			}
+		},
+		"folder": {
+			"name": "PRE_CLM/Tasks"
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-03-07T00:21:29Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

@@ -1,0 +1,239 @@
+{
+	"name": "tsk_RX_FILES_ARCHIVE",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Dat File Metadata",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/landing/edi/xml/fek_837p/')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"exists"
+					],
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			},
+			{
+				"name": "If Condition2",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Get Dat File Metadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@bool(activity('Get Dat File Metadata').output.exists)",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "No Files to Archive",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "v_dat_file_exists",
+								"value": false
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Delete the other files from landing",
+							"type": "Delete",
+							"dependsOn": [
+								{
+									"activity": "Move Files from Landing to Cold Storage",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 300,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "ds_ablob_files",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/landing/edi/xml/fek_837p')",
+											"type": "Expression"
+										},
+										"p_file_name": " ",
+										"p_hotstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								},
+								"enableLogging": false,
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"wildcardFileName": {
+										"value": "@{concat('FEK_837P_RX_*')}",
+										"type": "Expression"
+									},
+									"enablePartitionDiscovery": false
+								}
+							}
+						},
+						{
+							"name": "Move Files from Landing to Cold Storage",
+							"description": "Move Files from Landing to Cold",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 300,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "Source",
+									"value": "isdc/@{concat(pipeline().globalParameters.par_env, '/landing/compas_billing/')}/@{'*.DAT'}"
+								},
+								{
+									"name": "Destination",
+									"value": "isdc/@{concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing/')}/@{' '}"
+								}
+							],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobStorageReadSettings",
+										"recursive": true,
+										"wildcardFolderPath": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/landing/edi/xml/fek_837p/')",
+											"type": "Expression"
+										},
+										"wildcardFileName": {
+											"value": "@concat('FEK_837P_RX_*')",
+											"type": "Expression"
+										},
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "ds_ablob_files",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/landing/edi/xml/fek_837p/')",
+											"type": "Expression"
+										},
+										"p_file_name": " ",
+										"p_hotstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "ds_cold_archive",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/edi/xml/rx/', \n\nconcat(formatDateTime(convertTimeZone(utcnow(), 'UTC', 'Central Standard Time'), 'yyyy'),\n\nformatDateTime(convertTimeZone(utcnow(), 'UTC', 'Central Standard Time'),'MM'),\n\nformatDateTime(convertTimeZone(utcnow(), 'UTC', 'Central Standard Time'),'dd')),'/') ",
+											"type": "Expression"
+										},
+										"p_file_name": " ",
+										"p_coldstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_coldstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		],
+		"variables": {
+			"v_dat_file_exists": {
+				"type": "Boolean",
+				"defaultValue": false
+			}
+		},
+		"folder": {
+			"name": "PRE_CLM/Tasks"
+		},
+		"annotations": []
+	}
+}

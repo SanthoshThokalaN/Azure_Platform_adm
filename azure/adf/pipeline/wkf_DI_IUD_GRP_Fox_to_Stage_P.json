@@ -1,0 +1,93 @@
+{
+	"name": "wkf_DI_IUD_GRP_Fox_to_Stage_P",
+	"properties": {
+		"activities": [
+			{
+				"name": "wkf_DI_IUD_Fox_to_Stage_P",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "wkf_DI_IUD_Fox_to_Stage_P",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_db_name": {
+							"value": "@pipeline().parameters.p_db_name",
+							"type": "Expression"
+						},
+						"p_util_schema": {
+							"value": "@pipeline().parameters.p_util_schema",
+							"type": "Expression"
+						},
+						"p_proc_schema": {
+							"value": "@pipeline().parameters.p_proc_schema",
+							"type": "Expression"
+						},
+						"p_application": {
+							"value": "@pipeline().parameters.p_application",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "wkf_DI_IUD_Fox_EDI_to_Stage_P",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "wkf_DI_IUD_Fox_EDI_to_Stage_P",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_db_name": {
+							"value": "@pipeline().parameters.p_db_name",
+							"type": "Expression"
+						},
+						"p_util_schema": {
+							"value": "@pipeline().parameters.p_util_schema",
+							"type": "Expression"
+						},
+						"p_proc_schema": {
+							"value": "@pipeline().parameters.p_proc_schema",
+							"type": "Expression"
+						},
+						"p_application": {
+							"value": "@pipeline().parameters.p_application",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"p_db_name": {
+				"type": "string"
+			},
+			"p_util_schema": {
+				"type": "string"
+			},
+			"p_proc_schema": {
+				"type": "string"
+			},
+			"p_application": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "DATA_INGESTION/FOX"
+		},
+		"annotations": []
+	}
+}

@@ -1,0 +1,21 @@
+{
+	"name": "ls_ablob_isdc_cold",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"parameters": {
+			"p_coldstore_endpoint": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "AzureBlobStorage",
+		"typeProperties": {
+			"serviceEndpoint": "@{linkedService().p_coldstore_endpoint}",
+			"accountKind": "StorageV2"
+		},
+		"connectVia": {
+			"referenceName": "irt-adf-isdc",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

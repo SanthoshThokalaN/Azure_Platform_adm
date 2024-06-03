@@ -1,0 +1,498 @@
+{
+	"name": "tsk_TAXONOMY_DATA_PULL",
+	"properties": {
+		"activities": [
+			{
+				"name": "Stage Data to MED_APPROVED_AMT_STG",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Get ISDW_BATCHID_LATEST",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "OracleSource",
+						"oracleReaderQuery": {
+							"value": "@concat(\n'SELECT CLM_NBR, BIL_LN_NBR, MEDCR_APRV_AMT, ETL_LST_BTCH_ID, CLM_PD_DT_ID, ADJ_BEN_AMT FROM DM.F_CLM_BIL_LN_HIST WHERE ETL_LST_BTCH_ID >', activity('Get ISDW_BATCHID_LATEST').output.firstRow.ETL_LST_BTCH_ID)\n\n",
+							"type": "Expression"
+						},
+						"partitionOption": "None",
+						"convertDecimalToInteger": false,
+						"queryTimeout": "02:00:00"
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"maxRowsPerFile": 100000,
+							"fileNamePrefix": "med_approved_amt_stg",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_ora_isdw",
+						"type": "DatasetReference"
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_ablob_on_prem_db_to_sf",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_source_name": "isdw",
+							"p_table_name": "med_approved_amt_stg",
+							"p_env": {
+								"value": "@pipeline().globalParameters.par_env",
+								"type": "Expression"
+							},
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Delete Staged Files",
+				"type": "Delete",
+				"dependsOn": [
+					{
+						"activity": "Load MED_APPROVED_AMT",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_ablob_on_prem_db_to_sf",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_source_name": "isdw",
+							"p_table_name": "med_approved_amt_stg",
+							"p_env": {
+								"value": "@pipeline().globalParameters.par_env",
+								"type": "Expression"
+							},
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"wildcardFileName": "*.*",
+						"enablePartitionDiscovery": false
+					}
+				}
+			},
+			{
+				"name": "Truncate MED_APPROVED_AMT_STG",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Stage Data to MED_APPROVED_AMT_STG",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Output",
+									"size": "10"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Output",
+									"size": "10"
+								}
+							],
+							"type": "NonQuery",
+							"text": {
+								"value": "@concat('TRUNCATE TABLE ', pipeline().parameters.p_lz_isdw_schema, '.MED_APPROVED_AMT_STG;')",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Load MED_APPROVED_AMT_STG",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Truncate MED_APPROVED_AMT_STG",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "PROF_TAXONOMY_LOAD_PROCESS",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline()?.TriggeredByPipelineName,3,add(length(pipeline()?.TriggeredByPipelineName), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Get ISDW_BATCHID_LATEST",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SnowflakeSource",
+						"query": {
+							"value": "@concat('SELECT MAX(ETL_LST_BTCH_ID::NUMBER) AS ETL_LST_BTCH_ID FROM ', pipeline().parameters.p_src_isdw_schema,'.med_approved_amt')",
+							"type": "Expression"
+						},
+						"exportSettings": {
+							"type": "SnowflakeExportCopyCommand"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_sf_isdc",
+						"type": "DatasetReference",
+						"parameters": {
+							"par_sf_acct": {
+								"value": "@pipeline().globalParameters.par_sf_acct",
+								"type": "Expression"
+							},
+							"par_sf_db": {
+								"value": "@pipeline().globalParameters.par_sf_db",
+								"type": "Expression"
+							},
+							"par_sf_user": {
+								"value": "@pipeline().globalParameters.par_sf_user",
+								"type": "Expression"
+							},
+							"par_sf_wh": {
+								"value": "@pipeline().globalParameters.par_sf_wh",
+								"type": "Expression"
+							},
+							"par_sf_role": {
+								"value": "@pipeline().globalParameters.par_sf_role",
+								"type": "Expression"
+							}
+						}
+					}
+				}
+			},
+			{
+				"name": "Load MED_APPROVED_AMT",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Load MED_APPROVED_AMT_STG",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "MED_APPROVED_AMT_LOAD",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline()?.TriggeredByPipelineName,3,add(length(pipeline()?.TriggeredByPipelineName), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			}
+		],
+		"parameters": {
+			"p_util_schema": {
+				"type": "string",
+				"defaultValue": "util"
+			},
+			"p_isdw_schema": {
+				"type": "string"
+			},
+			"p_lz_isdw_schema": {
+				"type": "string"
+			},
+			"p_src_isdw_schema": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "PRE_CLM/Tasks"
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-03-07T00:21:33Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

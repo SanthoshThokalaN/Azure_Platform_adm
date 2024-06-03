@@ -1,0 +1,495 @@
+{
+	"name": "tsk_FOX_POSTADJ_IMPORT",
+	"properties": {
+		"activities": [
+			{
+				"name": "Stage Data",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Get Dates",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "OracleSource",
+						"oracleReaderQuery": {
+							"value": "@concat('select \nclaimHist.CLM_NUM,\nCASE\n        WHEN claimHist.clm_sys_id = ''UCPS''\n        THEN\n            CASE\n                WHEN TRIM(claimHist.FEK_CLM_IND) IS NULL\n                AND trim(claimHist.proc_typ_ind) IS NOT NULL\n                THEN CONCAT(claimHist.INST_PROF_IND,''-CMS/CH'')\n                WHEN TRIM(claimHist.FEK_CLM_IND) IS NOT NULL\n                AND trim(claimHist.proc_typ_ind) IS NOT NULL\n                THEN CONCAT(claimHist.INST_PROF_IND,''-FEK'')\n                ELSE CONCAT(NVL(trim(claimHist.INST_PROF_IND),''U''),''-MNL'')\n            END\n        ELSE NVL(trim(claimHist.INST_PROF_IND),''U'')||''-''||CLM_SRC_CD\n    END AS clmSource,\nCASE\n  WHEN TRIM(ecImage.FEK_CLM_IND) is null\n      THEN CONCAT(ecImage.CLM_INST_PROF_IND,''-CMS/CH'')\n  ELSE CONCAT(ecImage.CLM_INST_PROF_IND,''-FEK'')\nEND AS ecSource,\nclaimHist.CLM_SRC_CD,\nsuspense.SUSP_RSN AS ClaimSuspenseReason,\nsuspense.SUSP_DT AS ClaimSuspenseReasondate,\nCASE\n  WHEN claimHist.CLM_SYS_ID=''FOX''\n    THEN claimHist.ERR_CD\n  ELSE ecImage.SUSP_RSN\n  END AS ecSuspenseReason,\nTO_CHAR(claimHist.dt_cmpltd,''YYYY-MM-DD'') dt_cmpltd,\nclaimHist.dt_cmpltd dt_cmpltd_full,\nTO_CHAR(claimHist.srv_from_dt,''YYYY-MM-DD'') srv_from_dt,\nTO_CHAR(claimHist.srv_to_dt,''YYYY-MM-DD'') srv_to_dt,\nbillLineHist.BIL_LN_NUM,\nbillLineHist.chrg_amt,\nbillLineHist.MCARE_PD_AMT,\nbillLineHist.MCARE_APRVD_AMT,\nbillLineHist.PARTB_DED_AMT,\nbillLineHist.ben_amt,\nbillLineHist.cpt_cd,\nproviderTIN.tin,\nprovider.NAT_PROV_ID,\nclaimHist.oper_id,\nclaimHist.medcr_clm_ctl_nbr,\nclaimHist.clh_trk_id,\naccountInfo.acct_nbr,\nclaimInsInfo.orig_mbr_nbr,\n\nbillLineHist.AARP_DED_AMT,\nprofCharge.AARP_COPAY_AMT,\nreplace(replace(replace(claimNote.CLM_NOTE_DAT, CHR(13), ''''), CHR(10), ''''),''~'',''|'') CLM_NOTE_DAT,\nbillLineHist.PLN_CD,\nCASE\n  WHEN billLineHist.pln_cd = ''N''\n    THEN ''N01''\n  WHEN billLineHist.pln_cd = ''N0''\n    THEN ''N01''\n  WHEN billLineHist.pln_cd = ''NS''\n    THEN ''NS1''\n  ELSE billLineHist.pln_cd\nEND AS compas_pln_cd,\nbillLineHist.PLN_IND,\nCONCAT(billLineHist.PLN_CD, billLineHist.PLN_IND) AS PLAN,\noopBillLine.OOP_AMT,\nnvl(TRIM(claimHist.fclty_cd),''U'') AS plsrv_cd,\nbillLineHist.SRV_CD,\nbillLineHist.TYP_CD,\nbillLineHist.srv_cd || billLineHist.typ_cd tos_cd,\nbillLineHist.REND_PRV_NPI,\n\nclaimHist.ASSGN_ADJ_AMT,\nNVL(cast(regexp_replace(ecImage.CLM_TOT_APP_AMT_R, ''[^0-9]+'', '''') as number),0) AS CLM_TOT_APP_AMT_R_d,\nNVL(cast(regexp_replace(ecImage.CLM_TOT_DED_R, ''[^0-9]+'', '''') as number),0) AS CLM_TOT_DED_R_d,\nNVL(cast(regexp_replace(ecImage.CLM_TOT_AMT_PD_R, ''[^0-9]+'', '''') as number),0) AS CLM_TOT_AMT_PD_R_d,\nNVL(cast(regexp_replace(ecImage.CLM_TOT_COINSUR_AMT_R, ''[^0-9]+'', '''') as number),0) AS CLM_TOT_COINSUR_AMT_R_d,\npatPara.PAT_PARA_NUM,\nclaimHist.DOC_CTL_NBR\nfrom ',  \npipeline().parameters.p_fox_schema, '.clm_hist claimHist\nJOIN ',pipeline().parameters.p_fox_schema,'.prov provider\n  ON claimHist.assgn_prv_key = provider.prov_id\nLEFT OUTER JOIN ',pipeline().parameters.p_fox_schema,'.prov_addr providerAddress\n  ON provider.prov_partn_key = providerAddress.prov_partn_key\n  AND NVL(providerAddress.PROV_ADDR_STOP_DT,''31-Dec-9999'') = to_date(''31-Dec-9999'',''dd-Mon-yyyy'')\nJOIN ', pipeline().parameters.p_fox_schema,'.tin providerTIN\n  ON provider.TIN_ID = providerTIN.TIN_ID\nJOIN ', pipeline().parameters.p_fox_schema,'.bil_ln_hist2 billLineHist\n  ON claimHist.ch_key = billLineHist.ch_key\nJOIN ', pipeline().parameters.p_fox_schema,'.acct_info accountInfo\n  ON claimHist.acct_info_key = accountInfo.acct_info_key\nJOIN ', pipeline().parameters.p_fox_schema,'.CLM_INS_INFO claimInsInfo\n  ON claimHist.CH_KEY = claimInsInfo.CH_KEY\n  AND claimHist.CH_ACCT_PART_NUM = claimInsInfo.CH_ACCT_PART_NUM\n\nJOIN ', pipeline().parameters.p_fox_schema, '.PROF_CHRG profCharge\n  ON claimHist.CH_KEY=profCharge.CH_KEY\n  AND billLineHist.BIL_LN_NUM = profCharge.LN_NUM\nLEFT JOIN ',pipeline().parameters.p_fox_schema,'.CLM_NOTE claimNote\n  ON  claimHist.CH_KEY=claimNote.CH_KEY\nLEFT JOIN ',pipeline().parameters.p_fox_schema, '.OOP_BIL_LN oopBillLine\n  ON claimHist.CH_KEY=oopBillLine.CH_KEY\n  AND billLineHist.BLH_KEY=oopBillLine.BLH_KEY\n\nLEFT JOIN ',pipeline().parameters.p_fox_schema, '.ec_img ecImage\n  ON to_number(SUBSTR(lpad(claimHist.clm_num,12,''0''),1,11)) = to_number(ecImage.CLM_NBR)\n\nLEFT JOIN ', pipeline().parameters.p_fox_schema, '.SUSP suspense\n  ON claimHist.CH_KEY = suspense.CH_KEY\nLEFT JOIN ', pipeline().parameters.p_fox_schema, '.PAT_PARA2 patPara\n  ON claimHist.CH_KEY = patPara.CH_KEY\n  WHERE claimHist.dt_cmpltd between TO_TIMESTAMP(''', activity('Get Dates').output.firstRow.OLD_DT, ''',''YYYY-MM-DD HH24:MI:SS.FF'') AND TO_TIMESTAMP(''', activity('Get Dates').output.firstRow.LATEST_DT, ''',''YYYY-MM-DD HH24:MI:SS.FF'')')",
+							"type": "Expression"
+						},
+						"partitionOption": "None",
+						"convertDecimalToInteger": false,
+						"queryTimeout": "02:00:00"
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"maxRowsPerFile": 100000,
+							"fileNamePrefix": "fox_postadj_import_stg",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_ora_fox",
+						"type": "DatasetReference"
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_ablob_on_prem_db_to_sf",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_source_name": "fox",
+							"p_table_name": "fox_postadj_import_stg",
+							"p_env": {
+								"value": "@pipeline().globalParameters.par_env",
+								"type": "Expression"
+							},
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Delete Staged Files",
+				"type": "Delete",
+				"dependsOn": [
+					{
+						"activity": "Load Fox PostAdj Import Stg",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_ablob_on_prem_db_to_sf",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_source_name": "fox",
+							"p_table_name": "fox_postadj_import_stg",
+							"p_env": {
+								"value": "@pipeline().globalParameters.par_env",
+								"type": "Expression"
+							},
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"wildcardFileName": "*.*",
+						"enablePartitionDiscovery": false
+					}
+				}
+			},
+			{
+				"name": "Truncate Fox PostAdj Import Stg",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Stage Data",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": {
+								"value": "@concat('TRUNCATE TABLE ', pipeline().parameters.p_lz_fox_schema, '.FOX_POSTADJ_IMPORT_STG;')",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Load Fox PostAdj Import Stg",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Truncate Fox PostAdj Import Stg",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "FOX_POSTADJ_IMPORT_STG",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline()?.TriggeredByPipelineName,3,add(length(pipeline()?.TriggeredByPipelineName), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Load Fox PostAdj Import",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Delete Staged Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineRunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline()?.TriggeredByPipelineName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "FOX_POSTADJ_IMPORT",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline()?.TriggeredByPipelineName,3,add(length(pipeline()?.TriggeredByPipelineName), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Get Dates",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SnowflakeSource",
+						"query": {
+							"value": "@concat('SELECT substr(to_varchar(DATEADD(hour,-1,MAX(DT_CMPLTD_FULL)),''YYYY-MM-DD HH24:MI:SS.FF''),1,23) AS OLD_DT, substr(to_varchar(dateadd(hour,1,to_timestamp_ntz(current_timestamp)),''YYYY-MM-DD HH24:MI:SS.FF''),1,23) as LATEST_DT FROM ', pipeline().parameters.p_src_fox_schema,'.FOX_POSTADJ_IMPORT')",
+							"type": "Expression"
+						},
+						"exportSettings": {
+							"type": "SnowflakeExportCopyCommand"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_sf_isdc",
+						"type": "DatasetReference",
+						"parameters": {
+							"par_sf_acct": {
+								"value": "@pipeline().globalParameters.par_sf_acct",
+								"type": "Expression"
+							},
+							"par_sf_db": {
+								"value": "@pipeline().globalParameters.par_sf_db",
+								"type": "Expression"
+							},
+							"par_sf_user": {
+								"value": "@pipeline().globalParameters.par_sf_user",
+								"type": "Expression"
+							},
+							"par_sf_wh": {
+								"value": "@pipeline().globalParameters.par_sf_wh",
+								"type": "Expression"
+							},
+							"par_sf_role": {
+								"value": "@pipeline().globalParameters.par_sf_role",
+								"type": "Expression"
+							}
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"p_util_schema": {
+				"type": "string"
+			},
+			"p_fox_schema": {
+				"type": "string"
+			},
+			"p_lz_fox_schema": {
+				"type": "string"
+			},
+			"p_src_fox_schema": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "PRE_CLM/Tasks"
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-03-07T00:21:32Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

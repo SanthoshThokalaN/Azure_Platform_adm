@@ -1,0 +1,48 @@
+{
+	"name": "ds_cold_archive",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_ablob_isdc_cold",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"p_coldstore_endpoint": {
+					"value": "@dataset().p_coldstore_endpoint",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"p_folder_name": {
+				"type": "string"
+			},
+			"p_file_name": {
+				"type": "string"
+			},
+			"p_coldstore_endpoint": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"fileName": {
+					"value": "@dataset().p_file_name",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().p_folder_name",
+					"type": "Expression"
+				},
+				"container": "isdc"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

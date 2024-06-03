@@ -1,0 +1,23 @@
+{
+	"name": "ls_ora_isdw",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "Oracle",
+		"typeProperties": {
+			"connectionString": "host=ed21db02-vip;port=1521;serviceName=iswts01svc.uhc.com;user id=SVC_ACT_EDP_RO",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "ls_keyvault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "secret-ora-isdw"
+			}
+		},
+		"connectVia": {
+			"referenceName": "shir-adf-isdc",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

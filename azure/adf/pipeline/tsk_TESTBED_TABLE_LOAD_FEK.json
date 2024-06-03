@@ -1,0 +1,2056 @@
+{
+	"name": "tsk_TESTBED_TABLE_LOAD_FEK",
+	"properties": {
+		"activities": [
+			{
+				"name": "Until the DAT File",
+				"type": "Until",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@bool(variables('v_dat_file_exists'))",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Get Dat File Metadata",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 300,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "ds_ablob_files",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/landing/testbed/')",
+											"type": "Expression"
+										},
+										"p_file_name": "FEK*.txt",
+										"p_hotstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"childItems"
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							}
+						},
+						{
+							"name": "If Dat File Exists",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Get Dat File Metadata",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@greater(length(activity('Get Dat File Metadata').output.childItems), 0)",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Wait 10 minutes",
+										"type": "Wait",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"waitTimeInSeconds": 600
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Set variable true",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "v_dat_file_exists",
+											"value": true
+										}
+									}
+								]
+							}
+						}
+					],
+					"timeout": "0.01:00:00"
+				}
+			},
+			{
+				"name": "Move Files from Landing to Inbox",
+				"description": "Move Files from Landing to Inbox",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Until the DAT File",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Source",
+						"value": "isdc/@{concat(pipeline().globalParameters.par_env, '/landing/compas_billing/')}/@{'*.DAT'}"
+					},
+					{
+						"name": "Destination",
+						"value": "isdc/@{concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing/')}/@{' '}"
+					}
+				],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"wildcardFolderPath": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/landing/testbed/')",
+								"type": "Expression"
+							},
+							"wildcardFileName": {
+								"value": "@concat('FEK*.txt')",
+								"type": "Expression"
+							},
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/landing/testbed/')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/testbed/FEK')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Lookup_P_Files",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Generate FEK_Combined",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SnowflakeSource",
+						"query": "select distinct(FILE_PATTERN||'_'||needed_dates) as filename from(\nselect *, to_varchar(date(ucps_clm_part_start_date) + value::int,'YYYYMMDD') as needed_dates from\n(\nselect distinct doc_ctl_nbr,(dateadd(day,-30,ucps_clm_dt)::date) as ucps_clm_part_start_date,\n(dateadd(day,70,ucps_clm_dt)::date) as ucps_clm_part_end_date,* FROM SRC_EDI_837.FEKP_TESTBED_DATA),\ntable(flatten(array_generate_range(0, datediff('day', ucps_clm_part_start_date, ucps_clm_part_end_date) + 1)))\n);",
+						"exportSettings": {
+							"type": "SnowflakeExportCopyCommand"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_sf_isdc",
+						"type": "DatasetReference",
+						"parameters": {
+							"par_sf_acct": {
+								"value": "@pipeline().globalParameters.par_sf_acct",
+								"type": "Expression"
+							},
+							"par_sf_db": {
+								"value": "@pipeline().globalParameters.par_sf_db",
+								"type": "Expression"
+							},
+							"par_sf_user": {
+								"value": "@pipeline().globalParameters.par_sf_user",
+								"type": "Expression"
+							},
+							"par_sf_wh": {
+								"value": "@pipeline().globalParameters.par_sf_wh",
+								"type": "Expression"
+							},
+							"par_sf_role": {
+								"value": "@pipeline().globalParameters.par_sf_role",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach_P_File",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Lookup_P_Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Lookup_P_Files').output.value",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Copy From Archive_P",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobStorageReadSettings",
+										"recursive": true,
+										"wildcardFolderPath": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/bdpaas_archive/raw_claim/data/FEK_837PS_O/FEK_837PS_O.v0/')",
+											"type": "Expression"
+										},
+										"wildcardFileName": {
+											"value": "@concat('*',item().FILENAME,'*.txt')",
+											"type": "Expression"
+										},
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "ds_ablob_files",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/bdpaas_archive/raw_claim/data/FEK_837PS_O/FEK_837PS_O.v0/')",
+											"type": "Expression"
+										},
+										"p_file_name": {
+											"value": "@concat(item().FILENAME)",
+											"type": "Expression"
+										},
+										"p_hotstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "ds_ablob_files",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/testbed_preprocess/initial/fek/FEK_837PS_O.v0')",
+											"type": "Expression"
+										},
+										"p_file_name": {
+											"value": " ",
+											"type": "Expression"
+										},
+										"p_hotstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Copy From Raw_P",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobStorageReadSettings",
+										"recursive": true,
+										"wildcardFolderPath": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/landing/edi/raw/')",
+											"type": "Expression"
+										},
+										"wildcardFileName": {
+											"value": "@concat('*',item().FILENAME,'*.txt')",
+											"type": "Expression"
+										},
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "ds_ablob_files",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/landing/edi/raw/')",
+											"type": "Expression"
+										},
+										"p_file_name": {
+											"value": "@concat(item().FILENAME)",
+											"type": "Expression"
+										},
+										"p_hotstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "ds_ablob_files",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/testbed_preprocess/initial/fek/FEK_837PS_O.v0')",
+											"type": "Expression"
+										},
+										"p_file_name": {
+											"value": " ",
+											"type": "Expression"
+										},
+										"p_hotstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "Generate FEK_Combined",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Delete Final Reports",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "TESTBED_FEK_LOAD_PROCESS",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline()?.TriggeredByPipelineName,3,add(length(pipeline()?.TriggeredByPipelineName), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Generate FEKP_Report",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "ForEach_P_File",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "TESTBED_FEKP_FINAL_PROCESS",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline()?.TriggeredByPipelineName,3,add(length(pipeline()?.TriggeredByPipelineName), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Lookup_I_Files",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Generate FEK_Combined",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SnowflakeSource",
+						"query": "select distinct(FILE_PATTERN||'_'||needed_dates) as filename from(\nselect *, to_varchar(date(ucps_clm_part_start_date) + value::int,'YYYYMMDD') as needed_dates from\n(\nselect distinct doc_ctl_nbr,(dateadd(day,-30,ucps_clm_dt)::date) as ucps_clm_part_start_date,\n(dateadd(day,70,ucps_clm_dt)::date) as ucps_clm_part_end_date,* FROM SRC_EDI_837.FEKI_TESTBED_DATA),\ntable(flatten(array_generate_range(0, datediff('day', ucps_clm_part_start_date, ucps_clm_part_end_date) + 1)))\n);",
+						"exportSettings": {
+							"type": "SnowflakeExportCopyCommand"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_sf_isdc",
+						"type": "DatasetReference",
+						"parameters": {
+							"par_sf_acct": {
+								"value": "@pipeline().globalParameters.par_sf_acct",
+								"type": "Expression"
+							},
+							"par_sf_db": {
+								"value": "@pipeline().globalParameters.par_sf_db",
+								"type": "Expression"
+							},
+							"par_sf_user": {
+								"value": "@pipeline().globalParameters.par_sf_user",
+								"type": "Expression"
+							},
+							"par_sf_wh": {
+								"value": "@pipeline().globalParameters.par_sf_wh",
+								"type": "Expression"
+							},
+							"par_sf_role": {
+								"value": "@pipeline().globalParameters.par_sf_role",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach_I_File",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Lookup_I_Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Lookup_I_Files').output.value",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Copy from Archive_I",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobStorageReadSettings",
+										"recursive": true,
+										"wildcardFolderPath": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/bdpaas_archive/raw_claim/data/FEK_837IS_O/FEK_837IS_O.v0/')",
+											"type": "Expression"
+										},
+										"wildcardFileName": {
+											"value": "@concat('*',item().FILENAME,'*.txt')",
+											"type": "Expression"
+										},
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "ds_ablob_files",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/bdpaas_archive/raw_claim/data/FEK_837IS_O/FEK_837IS_O.v0/')",
+											"type": "Expression"
+										},
+										"p_file_name": {
+											"value": "@concat(item().FILENAME)",
+											"type": "Expression"
+										},
+										"p_hotstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "ds_ablob_files",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/testbed_preprocess/initial/fek/FEK_837IS_O.v0/')",
+											"type": "Expression"
+										},
+										"p_file_name": {
+											"value": " ",
+											"type": "Expression"
+										},
+										"p_hotstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Copy from Raw_I",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobStorageReadSettings",
+										"recursive": true,
+										"wildcardFolderPath": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/landing/edi/raw/')",
+											"type": "Expression"
+										},
+										"wildcardFileName": {
+											"value": "@concat('*',item().FILENAME,'*.txt')",
+											"type": "Expression"
+										},
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "ds_ablob_files",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/landing/edi/raw/')",
+											"type": "Expression"
+										},
+										"p_file_name": {
+											"value": "@concat(item().FILENAME)",
+											"type": "Expression"
+										},
+										"p_hotstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "ds_ablob_files",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/testbed_preprocess/initial/fek/FEK_837IS_O.v0/')",
+											"type": "Expression"
+										},
+										"p_file_name": {
+											"value": " ",
+											"type": "Expression"
+										},
+										"p_hotstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "Generate FEKI_Report",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "ForEach_I_File",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "TESTBED_FEKI_FINAL_PROCESS",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline()?.TriggeredByPipelineName,3,add(length(pipeline()?.TriggeredByPipelineName), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Move Files from Landing to Archive",
+				"description": "Move Files from Landing to Inbox",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Move Files from Landing to Inbox",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Source",
+						"value": "isdc/@{concat(pipeline().globalParameters.par_env, '/landing/compas_billing/')}/@{'*.DAT'}"
+					},
+					{
+						"name": "Destination",
+						"value": "isdc/@{concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing/')}/@{' '}"
+					}
+				],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"wildcardFolderPath": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/landing/testbed/')",
+								"type": "Expression"
+							},
+							"wildcardFileName": {
+								"value": "@concat('FEK*.txt')",
+								"type": "Expression"
+							},
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/landing/testbed/')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/archive/')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Delete Landing Files",
+				"type": "Delete",
+				"dependsOn": [
+					{
+						"activity": "Move Files from Landing to Archive",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/landing/testbed/')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"wildcardFileName": "FEK*.txt",
+						"enablePartitionDiscovery": false
+					}
+				}
+			},
+			{
+				"name": "Delete Summary File",
+				"type": "Delete",
+				"dependsOn": [
+					{
+						"activity": "Move Op Files from Output to Archive",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/testbed_preprocess/final_output/fek')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"wildcardFileName": {
+							"value": "@concat('*.xml')",
+							"type": "Expression"
+						},
+						"enablePartitionDiscovery": false
+					}
+				}
+			},
+			{
+				"name": "Move Summary File from Op to Arch",
+				"description": "Move Files from Landing to Inbox",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Delete Landing Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Source",
+						"value": "isdc/@{concat(pipeline().globalParameters.par_env, '/landing/compas_billing/')}/@{'*.DAT'}"
+					},
+					{
+						"name": "Destination",
+						"value": "isdc/@{concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing/')}/@{' '}"
+					}
+				],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"wildcardFolderPath": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/testbed_preprocess/final_output/fek')",
+								"type": "Expression"
+							},
+							"wildcardFileName": {
+								"value": "@concat('*.xml')",
+								"type": "Expression"
+							},
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/testbed_preprocess/final_output/fek')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_cold_archive",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/testbed_archive/', \n\nconcat(formatDateTime(convertTimeZone(utcnow(), 'UTC', 'Central Standard Time'), 'yyyy'),\n\nformatDateTime(convertTimeZone(utcnow(), 'UTC', 'Central Standard Time'),'MM'),\n\nformatDateTime(convertTimeZone(utcnow(), 'UTC', 'Central Standard Time'),'dd')),'/fek/') ",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_coldstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_coldstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Generate FEK_LOC_Merged",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Generate FEKP_Report",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Generate FEKI_Report",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "TESTBED_FEK_LOC_MERGE",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline()?.TriggeredByPipelineName,3,add(length(pipeline()?.TriggeredByPipelineName), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Generate FEK_Summary",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Generate FEK_LOC_Merged",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "TESTBED_FEK_SUMMARY",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline()?.TriggeredByPipelineName,3,add(length(pipeline()?.TriggeredByPipelineName), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Delete Initial Archive",
+				"type": "Delete",
+				"dependsOn": [
+					{
+						"activity": "Generate FEK_Summary",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/testbed_preprocess/initial/fek')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"wildcardFileName": "*.txt",
+						"enablePartitionDiscovery": false
+					}
+				}
+			},
+			{
+				"name": "Delete Input File",
+				"type": "Delete",
+				"dependsOn": [
+					{
+						"activity": "Delete Initial Archive",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/testbed/FEK/')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"wildcardFileName": "*.txt",
+						"enablePartitionDiscovery": false
+					}
+				}
+			},
+			{
+				"name": "Testbed_File_NameString",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Delete Input File",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SnowflakeSource",
+						"query": "SELECT DISTINCT rtrim(file, '.txt') as file from SRC_EDI_837.TESTBED_FEK_INPUT_CLAIMS_TMP;",
+						"exportSettings": {
+							"type": "SnowflakeExportCopyCommand"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_sf_isdc",
+						"type": "DatasetReference",
+						"parameters": {
+							"par_sf_acct": {
+								"value": "@pipeline().globalParameters.par_sf_acct",
+								"type": "Expression"
+							},
+							"par_sf_db": {
+								"value": "@pipeline().globalParameters.par_sf_db",
+								"type": "Expression"
+							},
+							"par_sf_user": {
+								"value": "@pipeline().globalParameters.par_sf_user",
+								"type": "Expression"
+							},
+							"par_sf_wh": {
+								"value": "@pipeline().globalParameters.par_sf_wh",
+								"type": "Expression"
+							},
+							"par_sf_role": {
+								"value": "@pipeline().globalParameters.par_sf_role",
+								"type": "Expression"
+							}
+						}
+					}
+				}
+			},
+			{
+				"name": "TBED_FILE_V",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Testbed_File_NameString",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "TBED_F_VAR",
+					"value": {
+						"value": "@activity('Testbed_File_NameString').output.firstRow.FILE",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "FEK File Movement to ECG",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "TBED_FILE_V",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "ecg_files_transfer",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_folder_name": {
+							"value": "@concat(pipeline().globalParameters.par_env,'/pre_clm/inbox/testbed_preprocess/final_output/fek/')",
+							"type": "Expression"
+						},
+						"p_file_name": {
+							"value": "@concat('summary_',variables('TBED_F_VAR'), '.xml')",
+							"type": "Expression"
+						},
+						"P_hotstore_endpoint": {
+							"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+							"type": "Expression"
+						},
+						"Target_Folder": "/dlz_tenant/",
+						"Actual_File_Name": {
+							"value": "DO_NOT_DELETE.dummy",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "FEKP File Movement to ECG",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "FEK File Movement to ECG",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "ecg_files_transfer",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_folder_name": {
+							"value": "@concat(pipeline().globalParameters.par_env,'/pre_clm/inbox/testbed_preprocess/final_output/fek/fekp')",
+							"type": "Expression"
+						},
+						"p_file_name": {
+							"value": "@concat('*',variables('TBED_F_VAR'),'.txt')",
+							"type": "Expression"
+						},
+						"P_hotstore_endpoint": {
+							"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+							"type": "Expression"
+						},
+						"Target_Folder": "/dlz_tenant/",
+						"Actual_File_Name": {
+							"value": "DO_NOT_DELETE.dummy",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "FEKI File Movement to ECG",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "FEKP File Movement to ECG",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "ecg_files_transfer",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_folder_name": {
+							"value": "@concat(pipeline().globalParameters.par_env,'/pre_clm/inbox/testbed_preprocess/final_output/fek/feki')",
+							"type": "Expression"
+						},
+						"p_file_name": {
+							"value": "@concat('*',variables('TBED_F_VAR'), '.txt')",
+							"type": "Expression"
+						},
+						"P_hotstore_endpoint": {
+							"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+							"type": "Expression"
+						},
+						"Target_Folder": "/dlz_tenant/",
+						"Actual_File_Name": {
+							"value": "DO_NOT_DELETE.dummy",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Delete Final Reports",
+				"type": "Delete",
+				"dependsOn": [
+					{
+						"activity": "Delete Summary File",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/testbed_preprocess/final_output/fek')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"wildcardFileName": {
+							"value": "@concat('*.txt')",
+							"type": "Expression"
+						},
+						"enablePartitionDiscovery": false
+					}
+				}
+			},
+			{
+				"name": "Move Op Files from Output to Archive",
+				"description": "Move Files from Landing to Inbox",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Move Summary File from Op to Arch",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Source",
+						"value": "isdc/@{concat(pipeline().globalParameters.par_env, '/landing/compas_billing/')}/@{'*.DAT'}"
+					},
+					{
+						"name": "Destination",
+						"value": "isdc/@{concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/compas_billing/')}/@{' '}"
+					}
+				],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"wildcardFolderPath": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/testbed_preprocess/final_output/fek')",
+								"type": "Expression"
+							},
+							"wildcardFileName": {
+								"value": "@concat('*.txt')",
+								"type": "Expression"
+							},
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_ablob_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/inbox/testbed_preprocess/final_output/fek')",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_cold_archive",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/testbed_archive/', \n\nconcat(formatDateTime(convertTimeZone(utcnow(), 'UTC', 'Central Standard Time'), 'yyyy'),\n\nformatDateTime(convertTimeZone(utcnow(), 'UTC', 'Central Standard Time'),'MM'),\n\nformatDateTime(convertTimeZone(utcnow(), 'UTC', 'Central Standard Time'),'dd')),'/fek/') ",
+								"type": "Expression"
+							},
+							"p_file_name": " ",
+							"p_coldstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_coldstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			}
+		],
+		"parameters": {
+			"p_util_schema": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"v_dat_file_exists": {
+				"type": "Boolean",
+				"defaultValue": false
+			},
+			"TBED_F_VAR": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "PRE_CLM/Tasks"
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-04-24T20:44:10Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

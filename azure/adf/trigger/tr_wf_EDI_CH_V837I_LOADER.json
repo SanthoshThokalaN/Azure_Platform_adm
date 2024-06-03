@@ -1,0 +1,30 @@
+{
+	"name": "tr_wf_EDI_CH_V837I_LOADER",
+	"properties": {
+		"annotations": [],
+		"runtimeState": "Stopped",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "wf_EDI_CH_V837I_LOADER",
+					"type": "PipelineReference"
+				},
+				"parameters": {
+					"p_file_source": "ch_v837i",
+					"p_email_recipient": "isdc_nonprod@ds.uhc.com",
+					"p_util_schema": "UTIL"
+				}
+			}
+		],
+		"type": "BlobEventsTrigger",
+		"typeProperties": {
+			"blobPathBeginsWith": "/isdc/blobs/$$$env_name/pre_clm/triggers/",
+			"blobPathEndsWith": "wf_EDI_CH_V837I_PREPROCESSOR_complete.trig",
+			"ignoreEmptyBlobs": true,
+			"scope": "/subscriptions/df55fbe1-ac66-4549-a170-1a3bbb27a6bf/resourceGroups/rg-isdc-nonprod/providers/Microsoft.Storage/storageAccounts/saisdcnonprod",
+			"events": [
+				"Microsoft.Storage.BlobCreated"
+			]
+		}
+	}
+}

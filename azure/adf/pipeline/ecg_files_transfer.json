@@ -1,0 +1,207 @@
+{
+	"name": "ecg_files_transfer",
+	"properties": {
+		"activities": [
+			{
+				"name": "If Environment",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "File_Check",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@and(equals(pipeline().globalParameters.par_env,'prd'),bool(activity('File_Check').output.exists))",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Environment_Check",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "Environment_Check",
+								"value": "The Environment is not matched or File is not exist. Please check your environment variable or File ."
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Stage Data",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 300,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobStorageReadSettings",
+										"recursive": true,
+										"wildcardFolderPath": {
+											"value": "@pipeline().parameters.p_folder_name",
+											"type": "Expression"
+										},
+										"wildcardFileName": {
+											"value": "@pipeline().parameters.p_file_name",
+											"type": "Expression"
+										},
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "SftpWriteSettings",
+										"operationTimeout": "01:00:00",
+										"useTempFileRename": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "ds_ablob_files_ecg_transfer",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@pipeline().parameters.p_folder_name",
+											"type": "Expression"
+										},
+										"p_hotstore_endpoint": {
+											"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "ds_ecg_files_transfer",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_folder_name": {
+											"value": "@pipeline().parameters.Target_Folder",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "File_Check",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_ablob_files1",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@pipeline().parameters.p_folder_name",
+								"type": "Expression"
+							},
+							"p_file_name": {
+								"value": "@pipeline().parameters.Actual_File_Name",
+								"type": "Expression"
+							},
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"exists"
+					],
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"p_folder_name": {
+				"type": "string"
+			},
+			"p_file_name": {
+				"type": "string"
+			},
+			"P_hotstore_endpoint": {
+				"type": "string"
+			},
+			"Target_Folder": {
+				"type": "string"
+			},
+			"Actual_File_Name": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"d": {
+				"type": "String"
+			},
+			"sd": {
+				"type": "String"
+			},
+			"s": {
+				"type": "Boolean"
+			},
+			"Environment_Check": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "PRE_CLM/Tasks"
+		},
+		"annotations": []
+	}
+}

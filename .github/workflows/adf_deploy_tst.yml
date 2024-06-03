@@ -1,0 +1,82 @@
+on:
+  workflow_dispatch:
+
+permissions:
+      id-token: write
+      contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+    - uses: actions/checkout@v3
+# Installs Node and the npm packages saved in your package.json file in the build
+    - name: Setup Node.js environment
+      uses: actions/setup-node@v3.4.1
+      with:
+        node-version: 14.x
+        
+    - name: install ADF Utilities package
+      run: npm install
+      working-directory: ${{github.workspace}}/azure/adf/  # (1) provide the folder location of the package.json file
+        
+# Validates all of the Data Factory resources in the repository. You'll get the same validation errors as when "Validate All" is selected.
+    - name: Validate
+      run: npm run build validate ${{github.workspace}}/azure/adf/ /subscriptions/df55fbe1-ac66-4549-a170-1a3bbb27a6bf/resourceGroups/rg-isdc-nonprod/providers/Microsoft.DataFactory/factories/adf-isdc-nonprod-dev # (2) The validate command needs the root folder location of your repository where all the objects are stored. And the 2nd parameter is the resourceID of the ADF instance 
+      working-directory: ${{github.workspace}}/azure/adf/
+ 
+
+    - name: Validate and Generate ARM template
+      run: npm run build export ${{github.workspace}}/azure/adf/ /subscriptions/df55fbe1-ac66-4549-a170-1a3bbb27a6bf/resourceGroups/rg-isdc-nonprod/providers/Microsoft.DataFactory/factories/adf-isdc-nonprod-dev "ExportedArmTemplate"  # (3) The build command, as validate, needs the root folder location of your repository where all the objects are stored. And the 2nd parameter is the resourceID of the ADF instance. The 3rd parameter is the exported ARM template artifact name 
+      working-directory: ${{github.workspace}}/azure/adf/
+
+    - name: Run Update Triggers
+      shell: pwsh
+      run: >
+          ./cicd/adf_tst_update_trigger.ps1 ${{github.workspace}}/azure/adf/ExportedArmTemplate/ARMTemplateForFactory.json ${{github.workspace}}/azure/adf/ExportedArmTemplate/ARMTemplateParametersForFactory.json
+       
+# In order to leverage the artifact in another job, we need to upload it with the upload action 
+    - name: upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ExportedArmTemplate # (4) use the same artifact name you used in the previous export step
+        path: ${{github.workspace}}/azure/adf/ExportedArmTemplate
+
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    
+ # we 1st download the previously uploaded artifact so we can leverage it later in the release job     
+      - name: Download a Build Artifact
+        uses: actions/download-artifact@v3.0.2
+        with:
+          name: ExportedArmTemplate # (5) Artifact name 
+
+
+      - name: Login via Az module
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_NONPROD_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_NONPROD_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_NONPROD_SUBSCRIPTION_ID }}
+          enable-AzPSSession: true
+
+      - name: Upgrade AzDataFactory Module
+        shell: pwsh
+        run: |
+          Install-Module -Name Az.DataFactory -RequiredVersion 1.18.3 -Force
+          
+
+      - name: data-factory-deploy
+        uses: Azure/data-factory-deploy-action@v1.2.0
+        with:
+          resourceGroupName: rg-isdc-nonprod #target ADF resource group name
+          dataFactoryName: adf-isdc-nonprod-tst #target ADF name
+          armTemplateFile: ARMTemplateForFactory.json #ARM template file from adf_publish branch
+          armTemplateParametersFile: ARMTemplateParametersForFactory.json #ARM template parameter file from adf_publish branch
+          #additionalParameters:  # Parameters which will be replaced in the ARM template. Expected format 'key1=value key2=value keyN=value'. At the minimum here you should provide the target ADF name parameter. Check the ARMTemplateParametersForFactory.json file for all the parameters that are expected in your scenario
+          additionalParameters: default_properties_par_sf_db_value=ISDC_DEV_TST_DW_DB default_properties_par_sf_wh_value=ISDC_DEV_ETL_XS_WH default_properties_par_env_value=tst
+          skipAzModuleInstallation: false

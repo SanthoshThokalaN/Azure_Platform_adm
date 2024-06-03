@@ -1,0 +1,44 @@
+{
+	"name": "ds_sqlserver_generic",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sqlserver_generic",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"p_server_name": {
+					"value": "@dataset().p_server_name",
+					"type": "Expression"
+				},
+				"p_database_name": {
+					"value": "@dataset().p_database_name",
+					"type": "Expression"
+				},
+				"p_user_name": {
+					"value": "@dataset().p_user_name",
+					"type": "Expression"
+				},
+				"p_secret_name": {
+					"value": "@dataset().p_secret_name",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"p_server_name": {
+				"type": "string"
+			},
+			"p_database_name": {
+				"type": "string"
+			},
+			"p_user_name": {
+				"type": "string"
+			},
+			"p_secret_name": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "SqlServerTable",
+		"schema": []
+	}
+}

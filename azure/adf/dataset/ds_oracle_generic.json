@@ -1,0 +1,51 @@
+{
+	"name": "ds_oracle_generic",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_oracle_generic",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"p_host": {
+					"value": "@dataset().p_host",
+					"type": "Expression"
+				},
+				"p_port": {
+					"value": "@dataset().p_port",
+					"type": "Expression"
+				},
+				"p_service_name": {
+					"value": "@dataset().p_service_name",
+					"type": "Expression"
+				},
+				"p_user_name": {
+					"value": "@dataset().p_user_name",
+					"type": "Expression"
+				},
+				"p_secret_name": {
+					"value": "@dataset().p_secret_name",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"p_host": {
+				"type": "string"
+			},
+			"p_port": {
+				"type": "string"
+			},
+			"p_service_name": {
+				"type": "string"
+			},
+			"p_user_name": {
+				"type": "string"
+			},
+			"p_secret_name": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "OracleTable",
+		"schema": []
+	}
+}

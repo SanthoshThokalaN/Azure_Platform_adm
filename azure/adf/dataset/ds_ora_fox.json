@@ -1,0 +1,13 @@
+{
+	"name": "ds_ora_fox",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_ora_fox",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "OracleTable",
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

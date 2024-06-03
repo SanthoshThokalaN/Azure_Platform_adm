@@ -1,0 +1,10 @@
+{
+	"name": "mpep-adf-hotstore-isdc",
+	"properties": {
+		"privateLinkResourceId": "/subscriptions/df55fbe1-ac66-4549-a170-1a3bbb27a6bf/resourceGroups/rg-isdc-nonprod/providers/Microsoft.Storage/storageAccounts/saisdcnonprod",
+		"groupId": "blob",
+		"fqdns": [
+			"saisdcnonprod.blob.core.windows.net"
+		]
+	}
+}

@@ -1,0 +1,23 @@
+{
+	"name": "ls_ora_compas",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "Oracle",
+		"typeProperties": {
+			"connectionString": "host=es30-scan01;port=1521;serviceName=cmpst02_1.uhc.com;user id=SVC_ACT_EDP_RO",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "ls_keyvault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "secret-ora-compas"
+			}
+		},
+		"connectVia": {
+			"referenceName": "shir-adf-isdc",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

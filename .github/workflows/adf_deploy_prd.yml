@@ -1,0 +1,105 @@
+on:
+  workflow_dispatch:
+
+permissions:
+      id-token: write
+      contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+    - uses: actions/checkout@v3
+# Installs Node and the npm packages saved in your package.json file in the build
+    - name: Setup Node.js environment
+      uses: actions/setup-node@v3.4.1
+      with:
+        node-version: 14.x
+        
+    - name: install ADF Utilities package
+      run: npm install
+      working-directory: ${{github.workspace}}/azure/adf/  # (1) provide the folder location of the package.json file
+        
+# Validates all of the Data Factory resources in the repository. You'll get the same validation errors as when "Validate All" is selected.
+    - name: Validate
+      run: npm run build validate ${{github.workspace}}/azure/adf/ /subscriptions/df55fbe1-ac66-4549-a170-1a3bbb27a6bf/resourceGroups/rg-isdc-nonprod/providers/Microsoft.DataFactory/factories/adf-isdc-nonprod-dev # (2) The validate command needs the root folder location of your repository where all the objects are stored. And the 2nd parameter is the resourceID of the ADF instance 
+      working-directory: ${{github.workspace}}/azure/adf/
+ 
+
+    - name: Validate and Generate ARM template
+      run: npm run build export ${{github.workspace}}/azure/adf/ /subscriptions/df55fbe1-ac66-4549-a170-1a3bbb27a6bf/resourceGroups/rg-isdc-nonprod/providers/Microsoft.DataFactory/factories/adf-isdc-nonprod-dev "ExportedArmTemplate"  # (3) The build command, as validate, needs the root folder location of your repository where all the objects are stored. And the 2nd parameter is the resourceID of the ADF instance. The 3rd parameter is the exported ARM template artifact name 
+      working-directory: ${{github.workspace}}/azure/adf/
+
+    - name: Run Update Triggers
+      shell: pwsh
+      run: >
+          ./cicd/adf_prd_update_trigger.ps1 ${{github.workspace}}/azure/adf/ExportedArmTemplate/ARMTemplateForFactory.json ${{github.workspace}}/azure/adf/ExportedArmTemplate/ARMTemplateParametersForFactory.json
+       
+# In order to leverage the artifact in another job, we need to upload it with the upload action 
+    - name: upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ExportedArmTemplate # (4) use the same artifact name you used in the previous export step
+        path: ${{github.workspace}}/azure/adf/ExportedArmTemplate
+
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    
+ # we 1st download the previously uploaded artifact so we can leverage it later in the release job     
+      - name: Download a Build Artifact
+        uses: actions/download-artifact@v3.0.2
+        with:
+          name: ExportedArmTemplate # (5) Artifact name 
+
+
+      - name: Login via Az module
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_PROD_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_PROD_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_PROD_SUBSCRIPTION_ID }}
+          enable-AzPSSession: true
+
+      - name: Upgrade AzDataFactory Module
+        shell: pwsh
+        run: |
+          Install-Module -Name Az.DataFactory -RequiredVersion 1.18.3 -Force
+          
+
+      - name: data-factory-deploy
+        uses: Azure/data-factory-deploy-action@v1.2.0
+        with:
+          resourceGroupName: rg-isdc-prod #target ADF resource group name
+          dataFactoryName: adf-isdc-prod-prd #target ADF name
+          armTemplateFile: ARMTemplateForFactory.json #ARM template file from adf_publish branch
+          armTemplateParametersFile: ARMTemplateParametersForFactory.json #ARM template parameter file from adf_publish branch
+          #additionalParameters:  # Parameters which will be replaced in the ARM template. Expected format 'key1=value key2=value keyN=value'. At the minimum here you should provide the target ADF name parameter. Check the ARMTemplateParametersForFactory.json file for all the parameters that are expected in your scenario
+          additionalParameters: factoryName=adf-isdc-prod-prd
+                                default_properties_par_sf_db_value=ISDC_PRD_DW_DB
+                                default_properties_par_sf_user_value=isdc_prd_dw@optum.com 
+                                default_properties_par_sf_wh_value=ISDC_PRD_ETL_XS_WH
+                                default_properties_par_sf_role_value=AR_PRD_ISDC_PRD_DW_OPTUM_ROLE
+                                default_properties_par_env_value=prd
+                                default_properties_par_sf_v2_db_value=UBLIA_PRD_ISDC_PRD_DB 
+                                default_properties_par_sf_v2_wh_value=UBLIA_PRD_ETL_XS_WH 
+                                default_properties_par_sf_v2_role_value=AZU_SDRP_UBLIA_PRD_DEVELOPER_ROLE 
+                                default_properties_par_sf_v2_user_value=ISDC_PRD_DW@OPTUM.COM 
+                                default_properties_par_sf_v2_acct_value=uhgdwaas.east-us-2.azure
+                                default_properties_par_graph_api_client_id_value=58c086b7-69cd-4b74-9630-a2d39f52dcfc
+                                default_properties_par_graph_api_secret_id_value=https://kv-isdc-prod.vault.azure.net/secrets/secret-sp-isdc-email-graph-api/f1ce8d0451a2459d98fe2cdeaad79077?api-version=7.4
+                                default_properties_par_tenant_id_value=db05faca-c82a-4b9d-b9c5-0f64b6755421
+                                default_properties_par_email_sender_value=isdc_noreply@uhc.com
+                                default_properties_par_blob_hotstore_endpoint_value=https://saisdcprod.blob.core.windows.net/
+                                default_properties_par_blob_coldstore_endpoint_value=https://sacoldisdcprod.blob.core.windows.net/
+                                mpep-adf-hotstore-isdc_properties_privateLinkResourceId=/subscriptions/3d58a242-5793-4087-947a-0ca97fbe8fb6/resourceGroups/rg-isdc-prod/providers/Microsoft.Storage/storageAccounts/saisdcprod
+                                mpep-adf-coldstore-isdc_properties_privateLinkResourceId=/subscriptions/3d58a242-5793-4087-947a-0ca97fbe8fb6/resourceGroups/rg-isdc-prod/providers/Microsoft.Storage/storageAccounts/sacoldisdcprod
+                                ls_ora_fox_connectionString=host=ep08-scan01;port=1521;serviceName=foxpr01svc.uhc.com;"user id"=SVC_ACT_EDP_RO
+                                ls_ora_compas_connectionString=host=ep30-scan01;port=1521;serviceName=cmppr06_4svc.uhc.com;"user id"=SVC_ACT_EDP_RO
+                                ls_ora_isdw_connectionString=host=ep26-scan01;port=1521;serviceName=iswpr01svc.uhc.com;"user id"=SVC_ACT_EDP_RO
+                                ls_keyvault_properties_typeProperties_baseUrl=https://kv-isdc-prod.vault.azure.net/
+
+          skipAzModuleInstallation: false

@@ -1,0 +1,140 @@
+{
+	"name": "utl_PRE_CLM_TRIGGERS_START_STOP",
+	"properties": {
+		"activities": [
+			{
+				"name": "ForEach Trigger",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Triggers List",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Triggers List').output.value",
+						"type": "Expression"
+					},
+					"batchCount": 10,
+					"activities": [
+						{
+							"name": "Start or Stop Triggers",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "Trigger Name",
+									"value": "@item().TRIGGER_NAME"
+								}
+							],
+							"typeProperties": {
+								"method": "POST",
+								"url": {
+									"value": "@concat('https://management.azure.com/subscriptions/',item().SUBSCRIPTION_ID, '/resourceGroups/',item().RESOURCE_GROUP, '/providers/Microsoft.DataFactory/factories/', item().DATA_FACTORY_NAME, '/triggers/', item().TRIGGER_NAME, '/', item().ACTIVE, '?api-version=', item().API_VERSION)\n\n",
+									"type": "Expression"
+								},
+								"connectVia": {
+									"referenceName": "irt-adf-isdc",
+									"type": "IntegrationRuntimeReference"
+								},
+								"body": {
+									"value": "@item().TRIGGER_NAME",
+									"type": "Expression"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://management.azure.com/"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get Triggers List",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SnowflakeSource",
+						"query": {
+							"value": "@concat('select  SUBSCRIPTION_ID ,\n RESOURCE_GROUP ,\n DATA_FACTORY_NAME ,\n TRIGGER_NAME ,\n CASE WHEN ACTIVE_INDC = ''Y'' then ''start'' else ''stop'' end ACTIVE,\n API_VERSION  from ', pipeline().parameters.p_util_schema, '.TRIGGERS_LIST WHERE APP_NAME = ''PRE_CLM'' '\n )",
+							"type": "Expression"
+						},
+						"exportSettings": {
+							"type": "SnowflakeExportCopyCommand"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_sf_isdc",
+						"type": "DatasetReference",
+						"parameters": {
+							"par_sf_acct": {
+								"value": "@pipeline().globalParameters.par_sf_acct",
+								"type": "Expression"
+							},
+							"par_sf_db": {
+								"value": "@pipeline().globalParameters.par_sf_db",
+								"type": "Expression"
+							},
+							"par_sf_user": {
+								"value": "@pipeline().globalParameters.par_sf_user",
+								"type": "Expression"
+							},
+							"par_sf_wh": {
+								"value": "@pipeline().globalParameters.par_sf_wh",
+								"type": "Expression"
+							},
+							"par_sf_role": {
+								"value": "@pipeline().globalParameters.par_sf_role",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			}
+		],
+		"parameters": {
+			"p_util_schema": {
+				"type": "string",
+				"defaultValue": "UTIL"
+			},
+			"p_email_recipient": {
+				"type": "string",
+				"defaultValue": "isdc_nonprod@ds.uhc.com"
+			}
+		},
+		"variables": {
+			"dummy": {
+				"type": "String",
+				"defaultValue": "True"
+			}
+		},
+		"folder": {
+			"name": "UTIL"
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-03-07T00:21:33Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

@@ -1,0 +1,13 @@
+{
+	"name": "ds_ora_isdw",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_ora_isdw",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "OracleTable",
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

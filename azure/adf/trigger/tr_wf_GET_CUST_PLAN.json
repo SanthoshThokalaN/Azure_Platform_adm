@@ -1,0 +1,39 @@
+{
+	"name": "tr_wf_GET_CUST_PLAN",
+	"properties": {
+		"annotations": [],
+		"runtimeState": "Stopped",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "wf_GET_CUST_PLAN",
+					"type": "PipelineReference"
+				},
+				"parameters": {
+					"p_email_recipient": "isdc_nonprod@ds.uhc.com",
+					"p_util_schema": "UTIL"
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Month",
+				"interval": 1,
+				"startTime": "2024-02-05T03:30:00",
+				"timeZone": "Central Standard Time",
+				"schedule": {
+					"minutes": [
+						30
+					],
+					"hours": [
+						3
+					],
+					"monthDays": [
+						1
+					]
+				}
+			}
+		}
+	}
+}

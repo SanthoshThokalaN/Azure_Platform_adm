@@ -1,0 +1,218 @@
+{
+	"name": "wf_LEGACY_CLG_MSG_ERRORS",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get TRAN_MTH",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SnowflakeSource",
+						"query": {
+							"value": "@concat('select TRAN_MTH from UTIL.LEGACY_LOAD \nwhere LOAD_INDC = ''N'' AND TABLE_NAME = ''', substring(pipeline().Pipeline,3,add(length(pipeline().Pipeline), -3)), ''''\n)\n\n",
+							"type": "Expression"
+						},
+						"exportSettings": {
+							"type": "SnowflakeExportCopyCommand"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_sf_isdc",
+						"type": "DatasetReference",
+						"parameters": {
+							"par_sf_acct": {
+								"value": "@pipeline().globalParameters.par_sf_acct",
+								"type": "Expression"
+							},
+							"par_sf_db": {
+								"value": "@pipeline().globalParameters.par_sf_db",
+								"type": "Expression"
+							},
+							"par_sf_user": {
+								"value": "@pipeline().globalParameters.par_sf_user",
+								"type": "Expression"
+							},
+							"par_sf_wh": {
+								"value": "@pipeline().globalParameters.par_sf_wh",
+								"type": "Expression"
+							},
+							"par_sf_role": {
+								"value": "@pipeline().globalParameters.par_sf_role",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach1",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get TRAN_MTH",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get TRAN_MTH').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "LOAD",
+							"type": "Script",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "LoadName",
+									"value": "@concat(substring(pipeline().Pipeline,3,add(length(pipeline().Pipeline), -3)), '_', item().TRAN_MTH)"
+								}
+							],
+							"linkedServiceName": {
+								"referenceName": "ls_sf_isdc",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"par_sf_acct": {
+										"value": "@pipeline().globalParameters.par_sf_acct",
+										"type": "Expression"
+									},
+									"par_sf_user": {
+										"value": "@pipeline().globalParameters.par_sf_user",
+										"type": "Expression"
+									},
+									"par_sf_db": {
+										"value": "@pipeline().globalParameters.par_sf_db",
+										"type": "Expression"
+									},
+									"par_sf_wh": {
+										"value": "@pipeline().globalParameters.par_sf_wh",
+										"type": "Expression"
+									},
+									"par_sf_role": {
+										"value": "@pipeline().globalParameters.par_sf_role",
+										"type": "Expression"
+									}
+								}
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"parameters": [
+											{
+												"name": "PIPELINE_ID",
+												"type": "String",
+												"value": {
+													"value": "@pipeline().RunId",
+													"type": "Expression"
+												},
+												"direction": "Input"
+											},
+											{
+												"name": "PIPELINE_NAME",
+												"type": "String",
+												"value": {
+													"value": "@pipeline().Pipeline",
+													"type": "Expression"
+												},
+												"direction": "Input"
+											},
+											{
+												"name": "TRAN_MTH",
+												"type": "String",
+												"value": {
+													"value": "@item().TRAN_MTH",
+													"type": "Expression"
+												},
+												"direction": "Input"
+											},
+											{
+												"name": "PROCESS_NAME",
+												"type": "String",
+												"value": {
+													"value": "@substring(\n    \n    pipeline().Pipeline, 3, add(length(pipeline().Pipeline), -3)\n    \n    )\n\n",
+													"type": "Expression"
+												},
+												"direction": "Input"
+											}
+										],
+										"type": "NonQuery",
+										"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET TRAN_MTH = ?;\r\nSET PROCESS_NAME = ?;\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM UTIL.PROGRAM_LIST \r\nWHERE UPPER(PROCESS_NAME) = $PROCESS_NAME AND APP_NAME = 'PRE_CLM';\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nEND;\r\n$$\r\n\r\n;"
+									}
+								],
+								"scriptBlockExecutionTimeout": "02:00:00"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "plt_email_notify",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "ForEach1",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "plt_email_notify",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailSender": {
+							"value": "@pipeline().globalParameters.par_email_sender",
+							"type": "Expression"
+						},
+						"EmailRecipient": "isdc_nonprod@ds.uhc.com",
+						"EmailSubject": {
+							"value": "@concat('ISDC ', toUpper(pipeline().globalParameters.par_env),' - ',  pipeline().Pipeline, ' FAILED')\n",
+							"type": "Expression"
+						},
+						"EmailContentHTML": {
+							"value": "@concat('ISDC ', toUpper(pipeline().globalParameters.par_env),' - ',  pipeline().Pipeline, ' FAILED')",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"folder": {
+			"name": "PRE_CLM/Legacy"
+		},
+		"annotations": [
+			"wf_LEGACY_CLG_MSG_ERRORS"
+		],
+		"lastPublishTime": "2024-03-07T00:21:33Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

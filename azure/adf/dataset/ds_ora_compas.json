@@ -1,0 +1,13 @@
+{
+	"name": "ds_ora_compas",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_ora_compas",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "OracleTable",
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

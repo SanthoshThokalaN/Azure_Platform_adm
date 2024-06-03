@@ -1,0 +1,26 @@
+{
+	"name": "ls_sftp_ecgpi",
+	"properties": {
+		"annotations": [],
+		"type": "Sftp",
+		"typeProperties": {
+			"host": "ecgpi.healthtechnologygroup.com",
+			"port": 22,
+			"skipHostKeyValidation": true,
+			"authenticationType": "Basic",
+			"userName": "is00dub",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "ls_keyvault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "secret-sftp-ecgpi"
+			}
+		},
+		"connectVia": {
+			"referenceName": "shir-adf-isdc",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

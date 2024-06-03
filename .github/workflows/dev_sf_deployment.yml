@@ -1,0 +1,20 @@
+name: Deployment SF Dev
+
+on:
+  push:
+    branches:
+      - 'feature**'
+
+  workflow_dispatch:
+  
+permissions:
+      id-token: write
+      contents: read
+
+jobs:
+  Snowflake_DW_Database:
+    uses: ./.github/workflows/snowflake.yml
+    with:
+      environment: DEV
+      database: dw_db
+    secrets: inherit

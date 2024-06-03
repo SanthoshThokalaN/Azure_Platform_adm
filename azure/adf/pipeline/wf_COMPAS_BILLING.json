@@ -1,0 +1,901 @@
+{
+	"name": "wf_COMPAS_BILLING",
+	"properties": {
+		"activities": [
+			{
+				"name": "tsk_COMPAS_BILLING",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Start Log",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "tsk_COMPAS_BILLING",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_util_schema": {
+							"value": "@pipeline().parameters.p_util_schema",
+							"type": "Expression"
+						},
+						"p_lz_compas_schema": {
+							"value": "@pipeline().parameters.p_lz_compas_schema",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "On Failure 1",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Start Log",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "plt_email_notify",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailSender": {
+							"value": "@pipeline().globalParameters.par_email_sender",
+							"type": "Expression"
+						},
+						"EmailRecipient": {
+							"value": "@pipeline().parameters.p_email_recipient",
+							"type": "Expression"
+						},
+						"EmailSubject": {
+							"value": "@concat('ISDC ', toUpper(pipeline().globalParameters.par_env),' - ',  pipeline().Pipeline, ' Failed')\n",
+							"type": "Expression"
+						},
+						"EmailContentHTML": {
+							"value": "@concat('PipelineName: ', pipeline().Pipeline, \n'<br>', activity('Start Log').error?.message)\n\n",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "On Failure 4",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Load Billing Tables in SRC",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "plt_email_notify",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailSender": {
+							"value": "@pipeline().globalParameters.par_email_sender",
+							"type": "Expression"
+						},
+						"EmailRecipient": {
+							"value": "@pipeline().parameters.p_email_recipient",
+							"type": "Expression"
+						},
+						"EmailSubject": {
+							"value": "@concat('ISDC ', toUpper(pipeline().globalParameters.par_env),' - ',  pipeline().Pipeline, ' FAILED')\n",
+							"type": "Expression"
+						},
+						"EmailContentHTML": {
+							"value": "@concat('PipelineName: ', pipeline().Pipeline, \n'<br>', replace(activity('Load Billing Tables in SRC').error?.message,'\"', '\\\"'))",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "On Failure 3",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "On Fail End Log",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "plt_email_notify",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailSender": {
+							"value": "@pipeline().globalParameters.par_email_sender",
+							"type": "Expression"
+						},
+						"EmailRecipient": {
+							"value": "@pipeline().parameters.p_email_recipient",
+							"type": "Expression"
+						},
+						"EmailSubject": {
+							"value": "@concat('ISDC ', toUpper(pipeline().globalParameters.par_env),' - ',  pipeline().Pipeline, ' FAILED')\n",
+							"type": "Expression"
+						},
+						"EmailContentHTML": {
+							"value": "@concat('PipelineName: ', pipeline().Pipeline, \n'<br>', activity('On Fail End Log').error?.message)\n\n",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Start Log",
+				"type": "Script",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline().Pipeline,3,add(length(pipeline().Pipeline), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline().Pipeline,3,add(length(pipeline().Pipeline), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "START_DATETIME",
+									"type": "String",
+									"value": {
+										"value": "@convertTimeZone(pipeline().TriggerTime, 'UTC', 'Central Standard Time')",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "STATUS",
+									"type": "String",
+									"value": {
+										"value": "Running",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "TRIGGER_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().TriggerName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "TRIGGER_TYPE",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().TriggerType",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "TRIGGER_TIME",
+									"type": "String",
+									"value": {
+										"value": "@convertTimeZone(pipeline().TriggerTime, 'UTC', 'Central Standard Time')",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "APP_NAME",
+									"type": "String",
+									"value": {
+										"value": "PRE_CLM",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": {
+								"value": "@CONCAT(\n    \n'USE SCHEMA ', pipeline().parameters.p_util_schema, ';',\n\n'INSERT INTO PROCESS_RUN_LOGS\n(\nPIPELINE_ID, \nPIPELINE_NAME, \nPROCESS_NAME,\nSUB_PROCESS_NAME,\nSTART_DATETIME,\nSTATUS, \nDATAFACTORY,\nTRIGGER_NAME,\nTRIGGER_TYPE, \nTRIGGER_TIME,\nAPP_NAME\n) \nVALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);')",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "On Complete End Log",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Load Billing Tables in SRC",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline().Pipeline,3,add(length(pipeline().Pipeline), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline().Pipeline,3,add(length(pipeline().Pipeline), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "START_DATETIME",
+									"type": "String",
+									"value": {
+										"value": "@convertTimeZone(pipeline().TriggerTime, 'UTC', 'Central Standard Time')",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "STATUS",
+									"type": "String",
+									"value": {
+										"value": "@activity('Load Billing Tables in SRC').Status\n",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "TRIGGER_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().TriggerName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "TRIGGER_TYPE",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().TriggerType",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "TRIGGER_TIME",
+									"type": "String",
+									"value": {
+										"value": "@convertTimeZone(pipeline().TriggerTime, 'UTC', 'Central Standard Time')",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "END_DATETIME",
+									"type": "String",
+									"value": {
+										"value": "@convertTimeZone(activity('Load Billing Tables in SRC').ExecutionEndTime, 'UTC', 'Central Standard Time')",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "MESSAGE",
+									"type": "String",
+									"value": {
+										"value": "null",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "APP_NAME",
+									"type": "String",
+									"value": {
+										"value": "PRE_CLM",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET START_DATETIME = ?;\r\nSET STATUS = ?;\r\nSET DATAFACTORY = ?;\r\nSET TRIGGER_NAME = ?;\r\nSET TRIGGER_TYPE = ?;\r\nSET TRIGGER_TIME = ?;\r\nSET END_DATETIME = ?;\r\nSET MESSAGE = ?;\r\nSET UTIL = ?;\r\nSET APP_NAME = ?;\r\n\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nV_PIPELINE_ID VARCHAR;\r\n\r\nBEGIN\r\n\r\nEXECUTE IMMEDIATE 'USE SCHEMA '||$UTIL;\r\n\r\nSELECT PIPELINE_ID INTO :v_PIPELINE_ID FROM PROCESS_RUN_LOGS WHERE PIPELINE_ID = $PIPELINE_ID;\r\n\r\nIF (v_PIPELINE_ID IS NOT NULL) THEN\r\n\r\nUPDATE PROCESS_RUN_LOGS SET END_DATETIME = $END_DATETIME, MESSAGE = $MESSAGE, STATUS = $STATUS WHERE PIPELINE_ID = $PIPELINE_ID;\r\n\r\nELSEIF (v_PIPELINE_ID IS NULL) THEN\r\n\r\nINSERT INTO PROCESS_RUN_LOGS\r\n(\r\nPIPELINE_ID,\r\nPIPELINE_NAME,\r\nPROCESS_NAME,\r\nSUB_PROCESS_NAME,\r\nSTART_DATETIME,\r\nEND_DATETIME,\r\nMESSAGE,\r\nSTATUS,\r\nDATAFACTORY,\r\nTRIGGER_NAME,\r\nTRIGGER_TYPE,\r\nTRIGGER_TIME,\r\nAPP_NAME\r\n)\r\n\r\nVALUES \r\n\r\n(\r\n$PIPELINE_ID,\r\n$PIPELINE_NAME,\r\n$PROCESS_NAME,\r\n$SUB_PROCESS_NAME,\r\n$START_DATETIME,\r\n$END_DATETIME,\r\n$MESSAGE,\r\n'Rerun '||$STATUS,\r\n$DATAFACTORY,\r\n$TRIGGER_NAME,\r\n$TRIGGER_TYPE,\r\n$TRIGGER_TIME,\r\n$APP_NAME\r\n\r\n)\r\n;\r\n\r\nEND IF;\r\n\r\nEND;\r\n\r\n$$\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "On Fail End Log",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "tsk_COMPAS_BILLING",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline().Pipeline,3,add(length(pipeline().Pipeline), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline().Pipeline,3,add(length(pipeline().Pipeline), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "START_DATETIME",
+									"type": "String",
+									"value": {
+										"value": "@convertTimeZone(pipeline().TriggerTime, 'UTC', 'Central Standard Time')",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "STATUS",
+									"type": "String",
+									"value": {
+										"value": "@activity('tsk_COMPAS_BILLING').Status",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "TRIGGER_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().TriggerName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "TRIGGER_TYPE",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().TriggerType",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "TRIGGER_TIME",
+									"type": "String",
+									"value": {
+										"value": "@convertTimeZone(pipeline().TriggerTime, 'UTC', 'Central Standard Time')",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "END_DATETIME",
+									"type": "String",
+									"value": {
+										"value": "@convertTimeZone(activity('tsk_COMPAS_BILLING').ExecutionEndTime, 'UTC', 'Central Standard Time')",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "MESSAGE",
+									"type": "String",
+									"value": {
+										"value": "null",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "APP_NAME",
+									"type": "String",
+									"value": {
+										"value": "PRE_CLM",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET START_DATETIME = ?;\r\nSET STATUS = ?;\r\nSET DATAFACTORY = ?;\r\nSET TRIGGER_NAME = ?;\r\nSET TRIGGER_TYPE = ?;\r\nSET TRIGGER_TIME = ?;\r\nSET END_DATETIME = ?;\r\nSET MESSAGE = ?;\r\nSET UTIL = ?;\r\nSET APP_NAME = ?;\r\n\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nV_PIPELINE_ID VARCHAR;\r\n\r\nBEGIN\r\n\r\nEXECUTE IMMEDIATE 'USE SCHEMA '||$UTIL;\r\n\r\nSELECT PIPELINE_ID INTO :v_PIPELINE_ID FROM PROCESS_RUN_LOGS WHERE PIPELINE_ID = $PIPELINE_ID;\r\n\r\nIF (v_PIPELINE_ID IS NOT NULL) THEN\r\n\r\nUPDATE PROCESS_RUN_LOGS SET END_DATETIME = $END_DATETIME, MESSAGE = $MESSAGE, STATUS = $STATUS WHERE PIPELINE_ID = $PIPELINE_ID;\r\n\r\nELSEIF (v_PIPELINE_ID IS NULL) THEN\r\n\r\nINSERT INTO PROCESS_RUN_LOGS\r\n(\r\nPIPELINE_ID,\r\nPIPELINE_NAME,\r\nPROCESS_NAME,\r\nSUB_PROCESS_NAME,\r\nSTART_DATETIME,\r\nEND_DATETIME,\r\nMESSAGE,\r\nSTATUS,\r\nDATAFACTORY,\r\nTRIGGER_NAME,\r\nTRIGGER_TYPE,\r\nTRIGGER_TIME,\r\nAPP_NAME\r\n)\r\n\r\nVALUES \r\n\r\n(\r\n$PIPELINE_ID,\r\n$PIPELINE_NAME,\r\n$PROCESS_NAME,\r\n$SUB_PROCESS_NAME,\r\n$START_DATETIME,\r\n$END_DATETIME,\r\n$MESSAGE,\r\n'Rerun '||$STATUS,\r\n$DATAFACTORY,\r\n$TRIGGER_NAME,\r\n$TRIGGER_TYPE,\r\n$TRIGGER_TIME,\r\n$APP_NAME\r\n\r\n)\r\n;\r\n\r\nEND IF;\r\n\r\nEND;\r\n\r\n$$\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "On Failure 2",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "tsk_COMPAS_BILLING",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "plt_email_notify",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailSender": {
+							"value": "@pipeline().globalParameters.par_email_sender",
+							"type": "Expression"
+						},
+						"EmailRecipient": {
+							"value": "@pipeline().parameters.p_email_recipient",
+							"type": "Expression"
+						},
+						"EmailSubject": {
+							"value": "@concat('ISDC ', toUpper(pipeline().globalParameters.par_env),' - ',  pipeline().Pipeline, ' FAILED')\n",
+							"type": "Expression"
+						},
+						"EmailContentHTML": {
+							"value": "@concat('PipelineName: ', pipeline().Pipeline, \n'<br>', replace(activity('tsk_COMPAS_BILLING').error?.message,'\"', '\\\"'))",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "On Failure 5",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "On Complete End Log",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "plt_email_notify",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailSender": {
+							"value": "@pipeline().globalParameters.par_email_sender",
+							"type": "Expression"
+						},
+						"EmailRecipient": {
+							"value": "@pipeline().parameters.p_email_recipient",
+							"type": "Expression"
+						},
+						"EmailSubject": {
+							"value": "@concat('ISDC ', toUpper(pipeline().globalParameters.par_env),' - ',  pipeline().Pipeline, ' FAILED')\n",
+							"type": "Expression"
+						},
+						"EmailContentHTML": {
+							"value": "@concat('PipelineName: ', pipeline().Pipeline, \n'<br>', activity('On Complete End Log').error?.message)",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Load Billing Tables in SRC",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "tsk_COMPAS_BILLING",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": "@pipeline().globalParameters.par_sf_acct",
+						"par_sf_user": "@pipeline().globalParameters.par_sf_user",
+						"par_sf_db": "@pipeline().globalParameters.par_sf_db",
+						"par_sf_wh": "@pipeline().globalParameters.par_sf_wh",
+						"par_sf_role": "@pipeline().globalParameters.par_sf_role"
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING_FINAL_LOAD",
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": "COMPAS_BILLING",
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET UTIL = ?;\r\nSET DATAFACTORY = ?;\r\nSET PROGRAM_LIST = $UTIL||'.PROGRAM_LIST';\r\nSET PROCESS_LIST = $UTIL||'.PROCESS_LIST';\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nv_OBJECT_DB VARCHAR;\r\nv_OBJECT_SCHEMA VARCHAR;\r\nv_OBJECT_NAME VARCHAR; \r\nv_OBJECT_SIGNATURE VARCHAR;\r\nv_STMT VARCHAR;\r\nBEGIN\r\n----------Get the meta data of the procedure and run it---------------------\r\nSELECT \r\nOBJECT_DB, \r\nOBJECT_SCHEMA, \r\nOBJECT_NAME, \r\nOBJECT_SIGNATURE\r\nINTO \r\n:v_OBJECT_DB, \r\n:v_OBJECT_SCHEMA, \r\n:v_OBJECT_NAME, \r\n:v_OBJECT_SIGNATURE\r\n\r\nFROM IDENTIFIER($PROGRAM_LIST) PGM JOIN IDENTIFIER($PROCESS_LIST) PRC ON PGM.PROCESS_NAME = PRC.PROCESS_NAME AND PGM.DATA_FACTORY_NAME = PRC.DATA_FACTORY_NAME AND PRC.ACTIVE_INDC = 'Y'\r\nWHERE UPPER(PGM.SUB_PROCESS_NAME) = $SUB_PROCESS_NAME AND UPPER(PGM.PROCESS_NAME) = $PROCESS_NAME AND PGM.DATA_FACTORY_NAME = $DATAFACTORY;\r\n\r\nv_STMT := 'CALL '||:v_OBJECT_DB||'.'||:v_OBJECT_SCHEMA||'.'||:v_OBJECT_NAME||:v_OBJECT_SIGNATURE;\r\n\r\nEXECUTE IMMEDIATE v_STMT;\r\n\r\nRETURN v_STMT; \r\n\r\nEND;\r\n$$\r\n\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Set variable",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Load Billing Tables in SRC",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "dummy",
+					"value": "true"
+				}
+			}
+		],
+		"parameters": {
+			"p_email_recipient": {
+				"type": "string",
+				"defaultValue": "isdc_nonprod@ds.uhc.com"
+			},
+			"p_util_schema": {
+				"type": "string",
+				"defaultValue": "UTIL"
+			},
+			"p_lz_compas_schema": {
+				"type": "string",
+				"defaultValue": "lz_compas"
+			}
+		},
+		"variables": {
+			"dummy": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "PRE_CLM/Workflows"
+		},
+		"annotations": [
+			"wf_COMPAS_BILLING"
+		],
+		"lastPublishTime": "2024-03-07T00:21:36Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

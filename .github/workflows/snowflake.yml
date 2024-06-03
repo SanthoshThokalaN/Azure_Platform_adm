@@ -1,0 +1,96 @@
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target Environment'
+        type: string
+        required: true
+      database:
+        type: string
+        required: true
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      database:
+        type: string
+        required: true
+
+# Concurrency catch to force stop existing runs if there is an updated push. 1 at a time.
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+  
+permissions:
+      id-token: write
+      contents: read
+
+jobs:
+  changes:
+    runs-on: [ uhg-runner ]
+    environment: ${{ inputs.environment }}
+    outputs:
+      snowflake: ${{ steps.filter.outputs.snowflake }}
+      snowflake_files: ${{ steps.filter.outputs.snowflake_files }}
+    steps:
+    # For pull requests it's not necessary to checkout the code
+    - uses: actions/checkout@v3
+      with: 
+        ref: ${{ github.ref }}
+        fetch-depth: 2
+    - name: Get previous commit SHA
+      id: prev_commit
+      run: echo "PREV_COMMIT_SHA=$(git rev-parse HEAD~1)" >> $GITHUB_ENV
+    - uses: uhg-actions/paths-filter@v2
+      id: filter
+      with:
+        list-files: shell
+        base: ${{ env.PREV_COMMIT_SHA }}
+        filters: |
+          snowflake:
+            - added|modified: 'data_model/${{ inputs.database }}/**'
+
+  Snowflake_Database:
+    # The type of runner that the job will run on
+    needs: changes
+    if: ${{ needs.changes.outputs.snowflake == 'true' }}
+    runs-on: [ uhg-runner ]
+    environment: ${{ inputs.environment }}
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USERNAME }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+      DEPLOYMENT_ENV_PREFIX: ${{ secrets.DEPLOYMENT_ENV_PREFIX }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Create pip.conf
+        run: |     
+          sudo pip config set global.index-url https://repo1.uhc.com/artifactory/api/pypi/pypi-virtual/simple
+
+      - name: Python Setup
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+          cache: 'pip' # caching pip dependencies
+          cache-dependency-path: '**/build-requirements.txt'
+
+      - name: Environment Setup
+        run: |
+            echo "Pre installing the python connector to mitigate a version issue." 
+            cd cicd
+            pip install -r build-requirements.txt
+
+      - name: Deploy Snowflake scripts
+        shell: bash 
+        run: |
+          echo "Deploy Changes"
+          python cicd/run_schemachange.py ${{ inputs.database }} -f ${{ needs.changes.outputs.snowflake_files }} 

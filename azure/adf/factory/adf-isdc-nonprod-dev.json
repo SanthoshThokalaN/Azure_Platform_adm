@@ -1,0 +1,81 @@
+{
+	"name": "adf-isdc-nonprod-dev",
+	"properties": {
+		"globalParameters": {
+			"par_sf_acct": {
+				"type": "string",
+				"value": "uhgdwaas.east-us-2.azure"
+			},
+			"par_sf_db": {
+				"type": "string",
+				"value": "ISDC_DEV_DW_DB"
+			},
+			"par_sf_user": {
+				"type": "string",
+				"value": "isdc_dev_dw@optum.com"
+			},
+			"par_sf_wh": {
+				"type": "string",
+				"value": "ISDC_DEV_ETL_XS_WH"
+			},
+			"par_sf_role": {
+				"type": "string",
+				"value": "AR_DEV_ISDC_DEV_DW_OPTUM_ROLE"
+			},
+			"par_env": {
+				"type": "string",
+				"value": "dev"
+			},
+			"par_graph_api_client_id": {
+				"type": "string",
+				"value": "565d5fb0-adcb-4725-a70d-a681e3422c27"
+			},
+			"par_graph_api_secret_id": {
+				"type": "string",
+				"value": "https://kv3-isdc-nonprod.vault.azure.net/secrets/secret-sp-isdc-email-graph-api/b3ec07b9c5724fd9bec71b98c7525e32?api-version=7.4"
+			},
+			"par_tenant_id": {
+				"type": "string",
+				"value": "db05faca-c82a-4b9d-b9c5-0f64b6755421"
+			},
+			"par_email_sender": {
+				"type": "string",
+				"value": "isdc_dev_dw@optum.com"
+			},
+			"par_blob_hotstore_endpoint": {
+				"type": "string",
+				"value": "https://saisdcnonprod.blob.core.windows.net/"
+			},
+			"par_blob_coldstore_endpoint": {
+				"type": "string",
+				"value": "https://sacoldisdcnonprod.blob.core.windows.net/"
+			},
+			"par_sf_v2_db": {
+				"type": "string",
+				"value": "UBLIA_DEV_ISDC_DEV_DB"
+			},
+			"par_sf_v2_role": {
+				"type": "string",
+				"value": "AZU_SDRP_UBLIA_DEV_DEVELOPER_ROLE"
+			},
+			"par_sf_v2_wh": {
+				"type": "string",
+				"value": "UBLIA_DEV_ETL_XS_WH"
+			},
+			"par_sf_v2_acct": {
+				"type": "string",
+				"value": "uhg-uhgdwaasnonprod"
+			},
+			"par_sf_v2_user": {
+				"type": "string",
+				"value": "ISDC_DEV_DW@OPTUM.COM"
+			}
+		}
+	},
+	"location": "eastus2",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "37446e4f-ffcb-4805-b685-9aacae23ac56",
+		"tenantId": "db05faca-c82a-4b9d-b9c5-0f64b6755421"
+	}
+}

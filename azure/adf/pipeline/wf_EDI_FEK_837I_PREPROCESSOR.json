@@ -1,0 +1,696 @@
+{
+	"name": "wf_EDI_FEK_837I_PREPROCESSOR",
+	"properties": {
+		"activities": [
+			{
+				"name": "tsk_EDI_837_FILE_PREPROCESSOR",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Start Log",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Name",
+						"value": "@pipeline().parameters.p_file_source"
+					}
+				],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "tsk_EDI_837_FILE_PREPROCESSOR",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_file_source": {
+							"value": "@pipeline().parameters.p_file_source",
+							"type": "Expression"
+						},
+						"p_email_sender": {
+							"value": "@pipeline().globalParameters.par_email_sender",
+							"type": "Expression"
+						},
+						"p_email_recipient": {
+							"value": "@pipeline().parameters.p_email_recipient",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "On Failure 1",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Start Log",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Name",
+						"value": "@pipeline().parameters.p_file_source"
+					}
+				],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "plt_email_notify",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailSender": {
+							"value": "@pipeline().globalParameters.par_email_sender",
+							"type": "Expression"
+						},
+						"EmailRecipient": {
+							"value": "@pipeline().parameters.p_email_recipient",
+							"type": "Expression"
+						},
+						"EmailSubject": {
+							"value": "@concat('ISDC ', toUpper(pipeline().globalParameters.par_env),' - ',  pipeline().Pipeline, ' Failed')\n",
+							"type": "Expression"
+						},
+						"EmailContentHTML": {
+							"value": "@concat('PipelineName: ', pipeline().Pipeline, \n'<br>', activity('Start Log').error?.message)\n\n",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "On Failure 2",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "tsk_EDI_837_FILE_PREPROCESSOR",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Name",
+						"value": "@pipeline().parameters.p_file_source"
+					}
+				],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "plt_email_notify",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailSender": {
+							"value": "@pipeline().globalParameters.par_email_sender",
+							"type": "Expression"
+						},
+						"EmailRecipient": {
+							"value": "@pipeline().parameters.p_email_recipient",
+							"type": "Expression"
+						},
+						"EmailSubject": {
+							"value": "@concat('ISDC ', toUpper(pipeline().globalParameters.par_env),' - ',  pipeline().Pipeline, ' FAILED')\n",
+							"type": "Expression"
+						},
+						"EmailContentHTML": {
+							"value": "@concat('PipelineName: ', pipeline().Pipeline, \n'<br>', replace(activity('tsk_EDI_837_FILE_PREPROCESSOR').error?.message,'\"', '\\\"'))",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "On Failure 3",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "End Log",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Name",
+						"value": "@pipeline().parameters.p_file_source"
+					}
+				],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "plt_email_notify",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailSender": {
+							"value": "@pipeline().globalParameters.par_email_sender",
+							"type": "Expression"
+						},
+						"EmailRecipient": {
+							"value": "@pipeline().parameters.p_email_recipient",
+							"type": "Expression"
+						},
+						"EmailSubject": {
+							"value": "@concat('ISDC ', toUpper(pipeline().globalParameters.par_env),' - ',  pipeline().Pipeline, ' FAILED')\n",
+							"type": "Expression"
+						},
+						"EmailContentHTML": {
+							"value": "@concat('PipelineName: ', pipeline().Pipeline, \n'<br>', activity('End Log').error?.message)\n\n",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Complete Trigger",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "tsk_EDI_837_FILE_PREPROCESSOR",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Name",
+						"value": "@pipeline().parameters.p_file_source"
+					}
+				],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_edi_837_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/triggers/')",
+								"type": "Expression"
+							},
+							"p_file_name": "DO_NOT_DELETE.dummy",
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_edi_837_files",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_folder_name": {
+								"value": "@concat(pipeline().globalParameters.par_env, '/pre_clm/triggers/')",
+								"type": "Expression"
+							},
+							"p_file_name": {
+								"value": "@concat(pipeline().Pipeline,'_complete.trig')",
+								"type": "Expression"
+							},
+							"p_hotstore_endpoint": {
+								"value": "@pipeline().globalParameters.par_blob_hotstore_endpoint",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "On Failure 4",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Complete Trigger",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Name",
+						"value": "@pipeline().parameters.p_file_source"
+					}
+				],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "plt_email_notify",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailSender": {
+							"value": "@pipeline().globalParameters.par_email_sender",
+							"type": "Expression"
+						},
+						"EmailRecipient": {
+							"value": "@pipeline().parameters.p_email_recipient",
+							"type": "Expression"
+						},
+						"EmailSubject": {
+							"value": "@concat('ISDC ', toUpper(pipeline().globalParameters.par_env),' - ',  pipeline().Pipeline, ' FAILED')\n",
+							"type": "Expression"
+						},
+						"EmailContentHTML": {
+							"value": "@concat('PipelineName: ', pipeline().Pipeline, \n'<br>', replace(activity('Complete Trigger').error?.message,'\"', '\\\"'))",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "End Log",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "tsk_EDI_837_FILE_PREPROCESSOR",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Name",
+						"value": "@pipeline().parameters.p_file_source"
+					}
+				],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline().Pipeline,3,add(length(pipeline().Pipeline), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline().Pipeline,3,add(length(pipeline().Pipeline), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "START_DATETIME",
+									"type": "String",
+									"value": {
+										"value": "@convertTimeZone(pipeline().TriggerTime, 'UTC', 'Central Standard Time')",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "STATUS",
+									"type": "String",
+									"value": {
+										"value": "@activity('tsk_EDI_837_FILE_PREPROCESSOR').Status",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "TRIGGER_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().TriggerName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "TRIGGER_TYPE",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().TriggerType",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "TRIGGER_TIME",
+									"type": "String",
+									"value": {
+										"value": "@convertTimeZone(pipeline().TriggerTime, 'UTC', 'Central Standard Time')",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "END_DATETIME",
+									"type": "String",
+									"value": {
+										"value": "@convertTimeZone(activity('tsk_EDI_837_FILE_PREPROCESSOR').ExecutionEndTime, 'UTC', 'Central Standard Time')",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "MESSAGE",
+									"type": "String",
+									"value": {
+										"value": "null",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "UTIL",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().parameters.p_util_schema",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "APP_NAME",
+									"type": "String",
+									"value": {
+										"value": "PRE_CLM",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": "SET PIPELINE_ID = ?;\r\nSET PIPELINE_NAME = ?;\r\nSET PROCESS_NAME = ?;\r\nSET SUB_PROCESS_NAME = ?;\r\nSET START_DATETIME = ?;\r\nSET STATUS = ?;\r\nSET DATAFACTORY = ?;\r\nSET TRIGGER_NAME = ?;\r\nSET TRIGGER_TYPE = ?;\r\nSET TRIGGER_TIME = ?;\r\nSET END_DATETIME = ?;\r\nSET MESSAGE = ?;\r\nSET UTIL = ?;\r\nSET APP_NAME = ?;\r\n\r\n\r\nEXECUTE IMMEDIATE\r\n$$\r\nDECLARE\r\nV_PIPELINE_ID VARCHAR;\r\n\r\nBEGIN\r\n\r\nEXECUTE IMMEDIATE 'USE SCHEMA '||$UTIL;\r\n\r\nSELECT PIPELINE_ID INTO :v_PIPELINE_ID FROM PROCESS_RUN_LOGS WHERE PIPELINE_ID = $PIPELINE_ID;\r\n\r\nIF (v_PIPELINE_ID IS NOT NULL) THEN\r\n\r\nUPDATE PROCESS_RUN_LOGS SET END_DATETIME = $END_DATETIME, MESSAGE = $MESSAGE, STATUS = $STATUS WHERE PIPELINE_ID = $PIPELINE_ID;\r\n\r\nELSEIF (v_PIPELINE_ID IS NULL) THEN\r\n\r\nINSERT INTO PROCESS_RUN_LOGS\r\n(\r\nPIPELINE_ID,\r\nPIPELINE_NAME,\r\nPROCESS_NAME,\r\nSUB_PROCESS_NAME,\r\nSTART_DATETIME,\r\nEND_DATETIME,\r\nMESSAGE,\r\nSTATUS,\r\nDATAFACTORY,\r\nTRIGGER_NAME,\r\nTRIGGER_TYPE,\r\nTRIGGER_TIME,\r\nAPP_NAME\r\n)\r\n\r\nVALUES \r\n\r\n(\r\n$PIPELINE_ID,\r\n$PIPELINE_NAME,\r\n$PROCESS_NAME,\r\n$SUB_PROCESS_NAME,\r\n$START_DATETIME,\r\n$END_DATETIME,\r\n$MESSAGE,\r\n'Rerun '||$STATUS,\r\n$DATAFACTORY,\r\n$TRIGGER_NAME,\r\n$TRIGGER_TYPE,\r\n$TRIGGER_TIME,\r\n$APP_NAME\r\n)\r\n;\r\n\r\nEND IF;\r\n\r\nEND;\r\n\r\n$$\r\n;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Start Log",
+				"type": "Script",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 300,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Name",
+						"value": "@pipeline().parameters.p_file_source"
+					}
+				],
+				"linkedServiceName": {
+					"referenceName": "ls_sf_isdc",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_sf_acct": {
+							"value": "@pipeline().globalParameters.par_sf_acct",
+							"type": "Expression"
+						},
+						"par_sf_user": {
+							"value": "@pipeline().globalParameters.par_sf_user",
+							"type": "Expression"
+						},
+						"par_sf_db": {
+							"value": "@pipeline().globalParameters.par_sf_db",
+							"type": "Expression"
+						},
+						"par_sf_wh": {
+							"value": "@pipeline().globalParameters.par_sf_wh",
+							"type": "Expression"
+						},
+						"par_sf_role": {
+							"value": "@pipeline().globalParameters.par_sf_role",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"parameters": [
+								{
+									"name": "PIPELINE_ID",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PIPELINE_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline().Pipeline,3,add(length(pipeline().Pipeline), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "SUB_PROCESS_NAME",
+									"type": "String",
+									"value": {
+										"value": "@substring(pipeline().Pipeline,3,add(length(pipeline().Pipeline), -3))",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "START_DATETIME",
+									"type": "String",
+									"value": {
+										"value": "@convertTimeZone(pipeline().TriggerTime, 'UTC', 'Central Standard Time')",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "STATUS",
+									"type": "String",
+									"value": {
+										"value": "Running",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "DATAFACTORY",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "TRIGGER_NAME",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().TriggerName",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "TRIGGER_TYPE",
+									"type": "String",
+									"value": {
+										"value": "@pipeline().TriggerType",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "TRIGGER_TIME",
+									"type": "String",
+									"value": {
+										"value": "@convertTimeZone(pipeline().TriggerTime, 'UTC', 'Central Standard Time')",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								},
+								{
+									"name": "APP_NAME",
+									"type": "String",
+									"value": {
+										"value": "PRE_CLM",
+										"type": "Expression"
+									},
+									"direction": "Input"
+								}
+							],
+							"type": "NonQuery",
+							"text": {
+								"value": "@CONCAT(\n    \n'USE SCHEMA ', pipeline().parameters.p_util_schema, ';',\n\n'INSERT INTO PROCESS_RUN_LOGS\n(\nPIPELINE_ID, \nPIPELINE_NAME, \nPROCESS_NAME,\nSUB_PROCESS_NAME,\nSTART_DATETIME,\nSTATUS, \nDATAFACTORY,\nTRIGGER_NAME,\nTRIGGER_TYPE, \nTRIGGER_TIME,\nAPP_NAME\n) \nVALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);')",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			}
+		],
+		"concurrency": 1,
+		"parameters": {
+			"p_file_source": {
+				"type": "string",
+				"defaultValue": "fek_837i"
+			},
+			"p_email_recipient": {
+				"type": "string",
+				"defaultValue": "isdc_nonprod@ds.uhc.com"
+			},
+			"p_util_schema": {
+				"type": "string",
+				"defaultValue": "UTIL"
+			}
+		},
+		"folder": {
+			"name": "PRE_CLM/Workflows"
+		},
+		"annotations": [
+			"wf_EDI_FEK_837I_PREPROCESSOR"
+		],
+		"lastPublishTime": "2024-03-07T00:21:37Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
